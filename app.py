@@ -1,9 +1,49 @@
 import os
+import requests
 import streamlit as st
 from gigachat import GigaChat
 from dotenv import load_dotenv
 
 load_dotenv()
+
+COURSES_BY_LEVEL = {
+    "Полный новичок": 5,
+    "Базовые знания": 4,
+    "Средний уровень": 3,
+    "Продвинутый": 2
+}
+
+def search_stepik_courses(query, budget, limit=5):
+    url = "https://stepik.org/api/courses"
+    params = {
+        "search": query,
+        "is_public": True,
+        "is_archived": False,
+        "page_size": 50
+    }
+
+    try:
+        response = requests.get(url, params=params, timeout=5)
+        courses = response.json().get("courses", [])
+    except Exception:
+        return []
+
+    result = []
+    for course in courses:
+        price = float(course.get("price", 0) or 0)
+        if budget == 0 and price > 0:
+            continue
+        if budget > 0 and price > budget:
+            continue
+        result.append({
+            "title": course.get("title"),
+            "url": f"https://stepik.org/course/{course.get('id')}/promo",
+            "price": int(price)
+        })
+        if len(result) >= limit:
+            break
+
+    return result
 
 st.set_page_config(page_title="Прогрессоры", page_icon="🚀", layout="centered")
 st.title("🚀 Прогрессоры")
@@ -22,6 +62,11 @@ if submitted:
     if not goal:
         st.warning("Укажи, чему хочешь научиться!")
     else:
+        limit = COURSES_BY_LEVEL[level]
+
+        with st.spinner("Ищем курсы на Stepik..."):
+            stepik_courses = search_stepik_courses(goal, budget, limit)
+
         with st.spinner("ИИ строит твой персональный маршрут..."):
             weeks = months * 4
             prompt = f"""Ты — персональный ИИ-навигатор по обучению. Составь детальный трек обучения для пользователя.
@@ -53,7 +98,7 @@ if submitted:
 ВАЖНЫЕ ОГРАНИЧЕНИЯ:
 
 1. ДОСТУПНОСТЬ В РФ
-   - Только платформы без VPN: Stepik, Яндекс Практикум, GeekBrains, Skillbox, Hexlet, Habr, YouTube
+   - Только платформы без VPN: Яндекс Практикум, GeekBrains, Skillbox, Hexlet, Habr, YouTube
    - Для иностранных ресурсов — указывай способ оплаты (СБП / крипта / нет российских карт)
    - Если для темы нет подходящего ресурса в РФ — укажи иностранный, но обязательно пометь: [⚠️ нужен VPN или альтернативная оплата]
 
@@ -66,7 +111,7 @@ if submitted:
 
 3. СТРУКТУРА ТРЕКА
    - Фазы: основы → практика → проект → результат
-   - Для каждого ресурса: название, ссылка, стоимость, время прохождения
+   - НЕ добавляй никаких ссылок — они будут добавлены отдельно
    - Обязательный финальный проект или портфолио
 
 Профиль пользователя:
@@ -85,8 +130,9 @@ if submitted:
 ## 📍 Этап 1: [Название]
 **Длительность:** X недель
 **Что изучать:** конкретные темы
-**Ресурсы:** 2-3 конкретных курса/книги/сайта
 **Результат:** что умеешь после этапа
+
+НЕ добавляй раздел "Ресурсы" и никаких ссылок — они будут показаны отдельно.
 
 ## 📍 Этап 2: [Название]
 ...и так далее
@@ -103,6 +149,15 @@ if submitted:
                 response = giga.chat(prompt)
                 result = response.choices[0].message.content
 
+        st.markdown("---")
+        st.markdown("## Твой персональный трек")
+        st.markdown(result)
+
+        if stepik_courses:
             st.markdown("---")
-            st.markdown("## Твой персональный трек")
-            st.markdown(result)
+            st.markdown("## 📚 Курсы на Stepik по твоей теме")
+            for course in stepik_courses:
+                price_text = "бесплатно" if course["price"] == 0 else f"{course['price']} руб"
+                st.markdown(f"- [{course['title']}]({course['url']}) — {price_text}")
+        else:
+            st.info("Курсы на Stepik по данной теме не найдены.")
