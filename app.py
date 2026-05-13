@@ -1,4 +1,6 @@
+import json
 import os
+import re
 import requests
 import streamlit as st
 from gigachat import GigaChat
@@ -6,12 +8,65 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+for key, default in [
+    ("step", "input"), ("goal", ""), ("hours", 10),
+    ("months", 3), ("budget", 0), ("questions", []),
+    ("level", "")
+]:
+    if key not in st.session_state:
+        st.session_state[key] = default
+
 COURSES_BY_LEVEL = {
     "Полный новичок": 5,
     "Базовые знания": 4,
     "Средний уровень": 3,
     "Продвинутый": 2
 }
+
+VALID_LEVELS = ["Полный новичок", "Базовые знания", "Средний уровень", "Продвинутый"]
+
+
+def parse_questions(raw: str) -> list:
+    raw = re.sub(r"```(?:json)?\s*", "", raw).strip().replace("```", "")
+    match = re.search(r"\[.*\]", raw, re.DOTALL)
+    if not match:
+        return []
+    try:
+        data = json.loads(match.group())
+        if not isinstance(data, list) or not data:
+            return []
+        for item in data:
+            if "question" not in item or "options" not in item:
+                return []
+        return data
+    except json.JSONDecodeError:
+        return []
+
+
+def parse_level(raw: str) -> str | None:
+    raw = raw.strip().strip("\"'.,")
+    for level in VALID_LEVELS:
+        if level in raw:
+            return level
+    return None
+
+
+def call_gigachat(prompt: str) -> str | None:
+    try:
+        with GigaChat(
+            credentials=os.getenv("GIGACHAT_AUTH_KEY"),
+            scope="GIGACHAT_API_PERS",
+            verify_ssl_certs=False
+        ) as giga:
+            response = giga.chat(prompt)
+            return response.choices[0].message.content
+    except Exception as e:
+        if "RateLimitError" in type(e).__name__:
+            st.error("Слишком много запросов к ИИ. Подожди немного и попробуй снова.")
+        else:
+            st.error(f"Ошибка при обращении к ИИ: {type(e).__name__}. Попробуй ещё раз.")
+        return None
+
 
 def search_stepik_courses(query, budget, limit=5):
     url = "https://stepik.org/api/courses"
@@ -21,7 +76,6 @@ def search_stepik_courses(query, budget, limit=5):
         "is_archived": False,
         "page_size": 50
     }
-
     try:
         response = requests.get(url, params=params, timeout=5)
         courses = response.json().get("courses", [])
@@ -42,36 +96,120 @@ def search_stepik_courses(query, budget, limit=5):
         })
         if len(result) >= limit:
             break
-
     return result
+
 
 st.set_page_config(page_title="Прогрессоры", page_icon="🚀", layout="centered")
 st.title("🚀 Прогрессоры")
 st.subheader("Персональный трек онлайн-обучения")
 
-with st.form("user_profile"):
-    st.markdown("### Расскажи о себе")
-    goal = st.text_input("Чему хочешь научиться?", placeholder="Например: Python-разработка, ML, веб-дизайн")
-    level = st.selectbox("Твой текущий уровень", ["Полный новичок", "Базовые знания", "Средний уровень", "Продвинутый"])
-    hours = st.slider("Сколько часов в неделю готов учиться?", 1, 40, 10)
-    months = st.slider("За сколько месяцев хочешь достичь цели?", 1, 12, 3)
-    budget = st.slider("Бюджет на обучение в месяц (руб)", 0, 10000, 0, step=500)
-    submitted = st.form_submit_button("Построить мой трек 🗺️")
+# ── Шаг 1: ввод данных ──────────────────────────────────────────────────────
+if st.session_state.step == "input":
+    with st.form("user_profile"):
+        st.markdown("### Расскажи о себе")
+        goal = st.text_input("Чему хочешь научиться?", placeholder="Например: Python-разработка, ML, веб-дизайн")
+        hours = st.slider("Сколько часов в неделю готов учиться?", 1, 40, 10)
+        months = st.slider("За сколько месяцев хочешь достичь цели?", 1, 12, 3)
+        budget = st.slider("Бюджет на обучение в месяц (руб)", 0, 10000, 0, step=500)
+        submitted = st.form_submit_button("Пройти диагностику 🎯")
 
-if submitted:
-    if not goal.strip():
-        st.warning("Укажи, чему хочешь научиться!")
-    elif not any(c.isalpha() for c in goal):
-        st.warning("Цель должна содержать буквы, а не только цифры или символы!")
-    else:
-        limit = COURSES_BY_LEVEL[level]
+    if submitted:
+        if not goal.strip():
+            st.warning("Укажи, чему хочешь научиться!")
+        elif not any(c.isalpha() for c in goal):
+            st.warning("Цель должна содержать буквы, а не только цифры или символы!")
+        else:
+            st.session_state.goal = goal
+            st.session_state.hours = hours
+            st.session_state.months = months
+            st.session_state.budget = budget
 
-        with st.spinner("Ищем курсы на Stepik..."):
-            stepik_courses = search_stepik_courses(goal, budget, limit)
+            with st.spinner("Составляем вопросы для диагностики..."):
+                prompt = f"""Ты — эксперт по диагностике знаний. Сгенерируй РОВНО 4 вопроса с вариантами ответов для оценки уровня знаний по теме: "{goal}".
 
-        with st.spinner("ИИ строит твой персональный маршрут..."):
-            weeks = months * 4
-            prompt = f"""Ты — персональный ИИ-навигатор по обучению. Составь детальный трек обучения для пользователя.
+Вопросы должны быть разного уровня сложности: от базового до продвинутого.
+
+Верни ТОЛЬКО валидный JSON без какого-либо текста до или после. Формат строго такой:
+[
+  {{"question": "Текст вопроса", "options": {{"A": "Вариант A", "B": "Вариант B", "C": "Вариант C", "D": "Вариант D"}}}}
+]
+
+Не добавляй пояснений, markdown-блоков, комментариев — только JSON-массив."""
+
+                raw = call_gigachat(prompt)
+                if raw is not None:
+                    questions = parse_questions(raw)
+                    if questions:
+                        st.session_state.questions = questions
+                        st.session_state.step = "quiz"
+                        st.rerun()
+                    else:
+                        st.error("Не удалось сгенерировать вопросы. Попробуй ещё раз.")
+
+# ── Шаг 2: диагностика ──────────────────────────────────────────────────────
+elif st.session_state.step == "quiz":
+    st.markdown("### 🎯 Диагностика уровня")
+    st.markdown(f"**Тема:** {st.session_state.goal}")
+    st.markdown("Ответь на вопросы — ИИ определит твой уровень автоматически.")
+    st.markdown("---")
+
+    for i, q in enumerate(st.session_state.questions):
+        options = q["options"]
+        choices = [f"{k}) {v}" for k, v in options.items()]
+        st.radio(f"**{i + 1}. {q['question']}**", choices, key=f"q_{i}")
+
+    st.markdown("---")
+    if st.button("Определить мой уровень ➡️"):
+        qa_lines = []
+        for i, q in enumerate(st.session_state.questions):
+            answer = st.session_state.get(f"q_{i}", "")
+            qa_lines.append(f"Вопрос {i + 1}: {q['question']}\nОтвет: {answer}")
+        qa_text = "\n\n".join(qa_lines)
+
+        level_prompt = f"""Ты — эксперт по диагностике уровня знаний. Проанализируй ответы пользователя по теме "{st.session_state.goal}".
+
+{qa_text}
+
+Верни СТРОГО ОДНО из четырёх значений (без кавычек, без пояснений, одна строка):
+Полный новичок
+Базовые знания
+Средний уровень
+Продвинутый"""
+
+        with st.spinner("Определяем твой уровень..."):
+            raw = call_gigachat(level_prompt)
+
+        if raw is not None:
+            level = parse_level(raw)
+            if level:
+                st.session_state.level = level
+                st.session_state.step = "result"
+                st.rerun()
+            else:
+                st.warning("Не удалось определить уровень автоматически. Выбери вручную:")
+                manual_level = st.selectbox("Твой уровень", VALID_LEVELS)
+                if st.button("Продолжить"):
+                    st.session_state.level = manual_level
+                    st.session_state.step = "result"
+                    st.rerun()
+
+# ── Шаг 3: результат ────────────────────────────────────────────────────────
+elif st.session_state.step == "result":
+    goal = st.session_state.goal
+    level = st.session_state.level
+    hours = st.session_state.hours
+    months = st.session_state.months
+    budget = st.session_state.budget
+    weeks = months * 4
+    limit = COURSES_BY_LEVEL[level]
+
+    st.success(f"Твой уровень: **{level}**")
+
+    with st.spinner("Ищем курсы на Stepik..."):
+        stepik_courses = search_stepik_courses(goal, budget, limit)
+
+    with st.spinner("ИИ строит твой персональный маршрут..."):
+        prompt = f"""Ты — персональный ИИ-навигатор по обучению. Составь детальный трек обучения для пользователя.
 
 ВАЖНО: Откажись составлять трек ТОЛЬКО в двух случаях:
 1. Цель физически невозможна ("стать суперменом", "научиться летать без снаряжения")
@@ -149,30 +287,26 @@ if submitted:
 ## 🎯 Итог
 Краткое описание карьерных перспектив после полного прохождения трека."""
 
-            try:
-                with GigaChat(
-                    credentials=os.getenv("GIGACHAT_AUTH_KEY"),
-                    scope="GIGACHAT_API_PERS",
-                    verify_ssl_certs=False
-                ) as giga:
-                    response = giga.chat(prompt)
-                    result = response.choices[0].message.content
-            except Exception as e:
-                if "RateLimitError" in type(e).__name__:
-                    st.error("Слишком много запросов к ИИ. Подожди немного и попробуй снова.")
-                else:
-                    st.error(f"Ошибка при обращении к ИИ: {type(e).__name__}. Попробуй ещё раз.")
-                st.stop()
+        result = call_gigachat(prompt)
+        if result is None:
+            st.stop()
 
+    st.markdown("---")
+    st.markdown("## Твой персональный трек")
+    st.markdown(result)
+
+    if stepik_courses:
         st.markdown("---")
-        st.markdown("## Твой персональный трек")
-        st.markdown(result)
+        st.markdown("## 📚 Курсы на Stepik по твоей теме")
+        for course in stepik_courses:
+            price_text = "бесплатно" if course["price"] == 0 else f"{course['price']} руб"
+            st.markdown(f"- [{course['title']}]({course['url']}) — {price_text}")
+    else:
+        st.info("Курсы на Stepik по данной теме не найдены.")
 
-        if stepik_courses:
-            st.markdown("---")
-            st.markdown("## 📚 Курсы на Stepik по твоей теме")
-            for course in stepik_courses:
-                price_text = "бесплатно" if course["price"] == 0 else f"{course['price']} руб"
-                st.markdown(f"- [{course['title']}]({course['url']}) — {price_text}")
-        else:
-            st.info("Курсы на Stepik по данной теме не найдены.")
+    st.markdown("---")
+    if st.button("🔄 Начать заново"):
+        st.session_state.step = "input"
+        st.session_state.questions = []
+        st.session_state.level = ""
+        st.rerun()
