@@ -143,13 +143,20 @@ if submitted:
 ## 🎯 Итог
 Краткое описание карьерных перспектив после полного прохождения трека."""
 
-            with GigaChat(
-                credentials=os.getenv("GIGACHAT_AUTH_KEY"),
-                scope="GIGACHAT_API_PERS",
-                verify_ssl_certs=False
-            ) as giga:
-                response = giga.chat(prompt)
-                result = response.choices[0].message.content
+            try:
+                with GigaChat(
+                    credentials=os.getenv("GIGACHAT_AUTH_KEY"),
+                    scope="GIGACHAT_API_PERS",
+                    verify_ssl_certs=False
+                ) as giga:
+                    response = giga.chat(prompt)
+                    result = response.choices[0].message.content
+            except Exception as e:
+                if "RateLimitError" in type(e).__name__:
+                    st.error("Слишком много запросов к ИИ. Подожди немного и попробуй снова.")
+                else:
+                    st.error(f"Ошибка при обращении к ИИ: {type(e).__name__}. Попробуй ещё раз.")
+                st.stop()
 
         st.markdown("---")
         st.markdown("## Твой персональный трек")
