@@ -11,7 +11,7 @@ load_dotenv()
 for key, default in [
     ("step", "input"), ("goal", ""), ("hours", 10),
     ("months", 3), ("budget", 0), ("questions", []),
-    ("level", "")
+    ("level", ""), ("qa_text", "")
 ]:
     if key not in st.session_state:
         st.session_state[key] = default
@@ -199,6 +199,7 @@ elif st.session_state.step == "quiz":
             level = parse_level(raw)
             if level:
                 st.session_state.level = level
+                st.session_state.qa_text = qa_text
                 st.session_state.step = "result"
                 st.rerun()
             else:
@@ -282,6 +283,11 @@ elif st.session_state.step == "result":
 - Время: {hours} часов в неделю
 - Срок: {months} месяцев ({weeks} недель)
 - Бюджет: {budget} руб/мес (0 = только бесплатные ресурсы)
+
+Результаты диагностики (ответы пользователя на вопросы по теме):
+{st.session_state.qa_text}
+
+ВАЖНО: используй эти ответы при составлении трека — не включай темы и навыки, которые пользователь явно уже освоил согласно его ответам.
 
 ВАЖНО: суммарная длительность ВСЕХ этапов должна быть ровно {weeks} недель. Не больше и не меньше.
 
