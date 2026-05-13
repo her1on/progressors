@@ -11,7 +11,7 @@ load_dotenv()
 for key, default in [
     ("step", "input"), ("goal", ""), ("hours", 10),
     ("months", 3), ("budget", 0), ("questions", []),
-    ("level", ""), ("qa_text", "")
+    ("level", ""), ("qa_text", ""), ("realism_warning", "")
 ]:
     if key not in st.session_state:
         st.session_state[key] = default
@@ -133,9 +133,44 @@ if st.session_state.step == "input":
             st.session_state.hours = hours
             st.session_state.months = months
             st.session_state.budget = budget
+            st.session_state.realism_warning = ""
 
-            with st.spinner("Составляем вопросы для диагностики..."):
-                prompt = f"""Ты — эксперт по диагностике уровня знаний. Сгенерируй РОВНО 4 вопроса для оценки уровня пользователя по теме: "{goal}".
+            with st.spinner("Проверяем реалистичность параметров..."):
+                realism_prompt = f"""Оцени реалистичность запроса:
+- Цель: {goal}
+- Срок: {months} месяцев
+- Время: {hours} часов в неделю
+- Бюджет: {budget} руб/мес (0 = только бесплатные ресурсы)
+
+Если цель достижима при таких параметрах — верни только слово: РЕАЛИСТИЧНО
+Если нет — верни: НЕРЕАЛИСТИЧНО
+И на следующей строке одно предложение: какой реальный минимальный срок и бюджет нужны."""
+
+                raw = call_gigachat(realism_prompt)
+                if raw and "НЕРЕАЛИСТИЧНО" in raw:
+                    lines = raw.strip().splitlines()
+                    explanation = lines[1].strip() if len(lines) > 1 else "Параметры нереалистичны для данной цели."
+                    st.session_state.realism_warning = explanation
+
+    if st.session_state.realism_warning:
+        st.warning(f"⚠️ {st.session_state.realism_warning}")
+        col1, col2 = st.columns(2)
+        with col1:
+            if st.button("Продолжить всё равно"):
+                st.session_state.realism_warning = ""
+                st.session_state.step = "generating"
+                st.rerun()
+        with col2:
+            if st.button("Скорректировать параметры"):
+                st.session_state.realism_warning = ""
+                st.rerun()
+
+    elif st.session_state.goal and st.session_state.step == "input" and not submitted:
+        pass
+
+    if st.session_state.step == "generating":
+        with st.spinner("Составляем вопросы для диагностики..."):
+            prompt = f"""Ты — эксперт по диагностике уровня знаний. Сгенерируй РОВНО 4 вопроса для оценки уровня пользователя по теме: "{st.session_state.goal}".
 
 Пользователь будет отвечать на каждый вопрос по фиксированной шкале:
 A) Никогда не пробовал / не слышал
@@ -158,15 +193,20 @@ D) Занимаюсь на продвинутом/профессионально
 
 Не добавляй пояснений, markdown-блоков, комментариев — только JSON-массив."""
 
-                raw = call_gigachat(prompt)
-                if raw is not None:
-                    questions = parse_questions(raw)
-                    if questions:
-                        st.session_state.questions = questions
-                        st.session_state.step = "quiz"
-                        st.rerun()
-                    else:
-                        st.error("Не удалось сгенерировать вопросы. Попробуй ещё раз.")
+            raw = call_gigachat(prompt)
+            if raw is not None:
+                questions = parse_questions(raw)
+                if questions:
+                    st.session_state.questions = questions
+                    st.session_state.step = "quiz"
+                    st.rerun()
+                else:
+                    st.error("Не удалось сгенерировать вопросы. Попробуй ещё раз.")
+                    st.session_state.step = "input"
+
+    elif submitted and not st.session_state.realism_warning and st.session_state.goal:
+        st.session_state.step = "generating"
+        st.rerun()
 
 # ── Шаг 2: диагностика ──────────────────────────────────────────────────────
 elif st.session_state.step == "quiz":
@@ -287,9 +327,7 @@ elif st.session_state.step == "result":
 
 В конце добавь раздел:
 ## 🎯 Итог
-Краткое описание карьерных перспектив после полного прохождения трека.
-
-Если заданный срок ({months} мес.) или бюджет ({budget} руб/мес.) нереалистичны для достижения цели "{goal}" — честно укажи это в разделе Итог. Напиши реалистичный минимальный срок и бюджет, которые реально нужны."""
+Краткое описание карьерных перспектив после полного прохождения трека."""
 
         result = call_gigachat(prompt)
         if result is None:
