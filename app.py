@@ -59,7 +59,7 @@ with st.form("user_profile"):
     submitted = st.form_submit_button("Построить мой трек 🗺️")
 
 if submitted:
-    if not goal:
+    if not goal.strip():
         st.warning("Укажи, чему хочешь научиться!")
     else:
         limit = COURSES_BY_LEVEL[level]
