@@ -123,6 +123,41 @@ if st.session_state.step == "input":
         budget = st.slider("Бюджет на обучение в месяц (руб)", 0, 10000, 0, step=500)
         submitted = st.form_submit_button("Пройти диагностику 🎯")
 
+    QUESTIONS_PROMPT = f"""Ты — эксперт по диагностике уровня знаний. Сгенерируй РОВНО 4 вопроса для оценки уровня пользователя по теме: "{st.session_state.goal}".
+
+Пользователь будет отвечать на каждый вопрос по фиксированной шкале:
+A) Никогда не пробовал / не слышал
+B) Знаком в теории, но не практиковал
+C) Практиковал, есть реальный опыт
+D) Занимаюсь на продвинутом/профессиональном уровне
+
+Формулируй вопросы так, чтобы ответ по этой шкале был естественным.
+Используй форму "Насколько ты знаком с...", "Как часто ты...", "В какой мере ты практиковал...".
+НЕ используй форму "Что такое...", "Какой...", "Сколько стоит..." — такие вопросы не подходят к шкале.
+Не спрашивай о косвенном опыте: просмотре контента, посещении мероприятий, общении с сообществом.
+
+Верни ТОЛЬКО валидный JSON без какого-либо текста до или после. Формат строго такой:
+[
+  {{"question": "Текст вопроса"}},
+  {{"question": "Текст вопроса"}},
+  {{"question": "Текст вопроса"}},
+  {{"question": "Текст вопроса"}}
+]
+
+Не добавляй пояснений, markdown-блоков, комментариев — только JSON-массив."""
+
+    def generate_questions():
+        with st.spinner("Составляем вопросы для диагностики..."):
+            raw = call_gigachat(QUESTIONS_PROMPT)
+            if raw is not None:
+                questions = parse_questions(raw)
+                if questions:
+                    st.session_state.questions = questions
+                    st.session_state.step = "quiz"
+                    st.rerun()
+                else:
+                    st.error("Не удалось сгенерировать вопросы. Попробуй ещё раз.")
+
     if submitted:
         if not goal.strip():
             st.warning("Укажи, чему хочешь научиться!")
@@ -151,6 +186,8 @@ if st.session_state.step == "input":
                     lines = raw.strip().splitlines()
                     explanation = lines[1].strip() if len(lines) > 1 else "Параметры нереалистичны для данной цели."
                     st.session_state.realism_warning = explanation
+                else:
+                    generate_questions()
 
     if st.session_state.realism_warning:
         st.warning(f"⚠️ {st.session_state.realism_warning}")
@@ -158,55 +195,11 @@ if st.session_state.step == "input":
         with col1:
             if st.button("Продолжить всё равно"):
                 st.session_state.realism_warning = ""
-                st.session_state.step = "generating"
-                st.rerun()
+                generate_questions()
         with col2:
             if st.button("Скорректировать параметры"):
                 st.session_state.realism_warning = ""
                 st.rerun()
-
-    elif st.session_state.goal and st.session_state.step == "input" and not submitted:
-        pass
-
-    if st.session_state.step == "generating":
-        with st.spinner("Составляем вопросы для диагностики..."):
-            prompt = f"""Ты — эксперт по диагностике уровня знаний. Сгенерируй РОВНО 4 вопроса для оценки уровня пользователя по теме: "{st.session_state.goal}".
-
-Пользователь будет отвечать на каждый вопрос по фиксированной шкале:
-A) Никогда не пробовал / не слышал
-B) Знаком в теории, но не практиковал
-C) Практиковал, есть реальный опыт
-D) Занимаюсь на продвинутом/профессиональном уровне
-
-Формулируй вопросы так, чтобы ответ по этой шкале был естественным.
-Используй форму "Насколько ты знаком с...", "Как часто ты...", "В какой мере ты практиковал...".
-НЕ используй форму "Что такое...", "Какой...", "Сколько стоит..." — такие вопросы не подходят к шкале.
-Не спрашивай о косвенном опыте: просмотре контента, посещении мероприятий, общении с сообществом.
-
-Верни ТОЛЬКО валидный JSON без какого-либо текста до или после. Формат строго такой:
-[
-  {{"question": "Текст вопроса"}},
-  {{"question": "Текст вопроса"}},
-  {{"question": "Текст вопроса"}},
-  {{"question": "Текст вопроса"}}
-]
-
-Не добавляй пояснений, markdown-блоков, комментариев — только JSON-массив."""
-
-            raw = call_gigachat(prompt)
-            if raw is not None:
-                questions = parse_questions(raw)
-                if questions:
-                    st.session_state.questions = questions
-                    st.session_state.step = "quiz"
-                    st.rerun()
-                else:
-                    st.error("Не удалось сгенерировать вопросы. Попробуй ещё раз.")
-                    st.session_state.step = "input"
-
-    elif submitted and not st.session_state.realism_warning and st.session_state.goal:
-        st.session_state.step = "generating"
-        st.rerun()
 
 # ── Шаг 2: диагностика ──────────────────────────────────────────────────────
 elif st.session_state.step == "quiz":
