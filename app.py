@@ -50,12 +50,15 @@ def parse_questions(raw: str) -> list:
         return []
 
 
-def parse_level(raw: str) -> str | None:
-    raw = raw.strip().strip("\"'.,")
-    for level in VALID_LEVELS:
-        if level in raw:
-            return level
-    return None
+def calculate_level(answers: list) -> str:
+    score = sum(FIXED_OPTIONS.index(a) for a in answers)
+    if score <= 3:
+        return "Полный новичок"
+    elif score <= 6:
+        return "Базовые знания"
+    elif score <= 9:
+        return "Средний уровень"
+    return "Продвинутый"
 
 
 def call_gigachat(prompt: str) -> str | None:
@@ -177,39 +180,15 @@ elif st.session_state.step == "quiz":
 
     st.markdown("---")
     if st.button("Определить мой уровень ➡️"):
+        answers = [st.session_state.get(f"q_{i}", FIXED_OPTIONS[0]) for i in range(len(st.session_state.questions))]
         qa_lines = []
         for i, q in enumerate(st.session_state.questions):
-            answer = st.session_state.get(f"q_{i}", "")
-            qa_lines.append(f"Вопрос {i + 1}: {q['question']}\nОтвет: {answer}")
-        qa_text = "\n\n".join(qa_lines)
+            qa_lines.append(f"Вопрос {i + 1}: {q['question']}\nОтвет: {answers[i]}")
 
-        level_prompt = f"""Ты — эксперт по диагностике уровня знаний. Проанализируй ответы пользователя по теме "{st.session_state.goal}".
-
-{qa_text}
-
-Верни СТРОГО ОДНО из четырёх значений (без кавычек, без пояснений, одна строка):
-Полный новичок
-Базовые знания
-Средний уровень
-Продвинутый"""
-
-        with st.spinner("Определяем твой уровень..."):
-            raw = call_gigachat(level_prompt)
-
-        if raw is not None:
-            level = parse_level(raw)
-            if level:
-                st.session_state.level = level
-                st.session_state.qa_text = qa_text
-                st.session_state.step = "result"
-                st.rerun()
-            else:
-                st.warning("Не удалось определить уровень автоматически. Выбери вручную:")
-                manual_level = st.selectbox("Твой уровень", VALID_LEVELS)
-                if st.button("Продолжить"):
-                    st.session_state.level = manual_level
-                    st.session_state.step = "result"
-                    st.rerun()
+        st.session_state.level = calculate_level(answers)
+        st.session_state.qa_text = "\n\n".join(qa_lines)
+        st.session_state.step = "result"
+        st.rerun()
 
 # ── Шаг 3: результат ────────────────────────────────────────────────────────
 elif st.session_state.step == "result":
