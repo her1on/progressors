@@ -61,6 +61,8 @@ with st.form("user_profile"):
 if submitted:
     if not goal.strip():
         st.warning("Укажи, чему хочешь научиться!")
+    elif not any(c.isalpha() for c in goal):
+        st.warning("Цель должна содержать буквы, а не только цифры или символы!")
     else:
         limit = COURSES_BY_LEVEL[level]
 
