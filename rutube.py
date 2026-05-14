@@ -1,7 +1,5 @@
 import requests
 
-EDUCATION_CATEGORY_ID = 17
-
 
 def format_duration(seconds: int) -> str:
     m, s = divmod(seconds, 60)
@@ -24,8 +22,8 @@ def search_rutube_videos(query: str, limit: int = 3) -> list[dict]:
             }
         )
         results = response.json().get("results", [])
-    except Exception as e:
-        return [{"_error": str(e), "title": "", "url": "", "author": "", "duration": ""}]
+    except Exception:
+        return []
 
     filtered = []
     for v in results:
@@ -34,9 +32,6 @@ def search_rutube_videos(query: str, limit: int = 3) -> list[dict]:
         if v.get("is_paid"):
             continue
         if v.get("is_adult") or v.get("is_livestream"):
-            continue
-        category = v.get("category") or {}
-        if category.get("id") != EDUCATION_CATEGORY_ID:
             continue
 
         filtered.append({

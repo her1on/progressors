@@ -301,9 +301,7 @@ elif st.session_state.step == "result":
     else:
         st.info("Курсы на Stepik по данной теме не найдены.")
 
-    if rutube_videos and "_error" in rutube_videos[0]:
-        st.warning(f"⚠️ Rutube debug: {rutube_videos[0]['_error']}")
-    elif rutube_videos:
+    if rutube_videos:
         st.markdown("---")
         st.markdown("## 🎬 Видео на Rutube по твоей теме")
         for video in rutube_videos:
