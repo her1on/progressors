@@ -347,14 +347,25 @@ elif st.session_state.step == "result":
         st.progress(done / len(stages))
         st.caption(f"{done} из {len(stages)} этапов пройдено")
 
-    st.markdown(result)
+    parts = re.split(r"\n(?=## )", "\n" + result.strip())
+    parts = [p.strip() for p in parts if p.strip()]
+
+    stage_index = 0
+    for part in parts:
+        if part.startswith("## 📍 Этап"):
+            title_match = re.match(r"## 📍 Этап \d+: (.+)", part)
+            title = title_match.group(1).strip() if title_match else f"Этап {stage_index + 1}"
+            content = part[part.index("\n"):].strip() if "\n" in part else ""
+            is_done = st.session_state.get(f"stage_{stage_index}", False)
+            prefix = "✅" if is_done else "⚪"
+            with st.expander(f"{prefix} Этап {stage_index + 1}: {title}"):
+                st.markdown(content)
+                st.checkbox("Отметить как пройденный", key=f"stage_{stage_index}")
+            stage_index += 1
+        else:
+            st.markdown(part)
 
     if stages:
-        st.markdown("---")
-        st.markdown("### ✅ Отметь пройденные этапы")
-        for i, title in enumerate(stages):
-            st.checkbox(f"Этап {i + 1}: {title}", key=f"stage_{i}")
-
         done = sum(1 for i in range(len(stages)) if st.session_state.get(f"stage_{i}", False))
         if done == len(stages):
             st.success("🎉 Поздравляем! Ты прошёл весь трек. Время двигаться дальше!")
