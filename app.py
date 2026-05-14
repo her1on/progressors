@@ -151,6 +151,7 @@ elif st.session_state.step == "result":
     weeks = months * 4
     limit = COURSES_BY_LEVEL[level]
 
+    st.markdown(f"### 🎯 Цель: {goal}")
     st.success(f"Твой уровень: **{level}**")
 
     with st.spinner("Ищем курсы на Stepik..."):
