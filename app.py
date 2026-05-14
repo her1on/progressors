@@ -7,7 +7,8 @@ from stepik import search_stepik_courses
 for key, default in [
     ("step", "input"), ("goal", ""), ("hours", 10),
     ("months", 3), ("budget", 0), ("questions", []),
-    ("level", ""), ("qa_text", ""), ("realism_warning", "")
+    ("level", ""), ("qa_text", ""), ("realism_warning", ""),
+    ("institutional_warning", ""), ("hours_blocked", False)
 ]:
     if key not in st.session_state:
         st.session_state[key] = default
@@ -78,6 +79,8 @@ D) Занимаюсь на продвинутом/профессионально
             st.session_state.months = months
             st.session_state.budget = budget
             st.session_state.realism_warning = ""
+            st.session_state.institutional_warning = ""
+            st.session_state.hours_blocked = False
 
             BUDGET_INFO = {
                 0:     "**Бесплатно** — YouTube, бесплатные курсы на Stepik, открытая документация и GitHub. Прогресс возможен, но медленнее: меньше структуры и обратной связи.",
@@ -87,26 +90,79 @@ D) Занимаюсь на продвинутом/профессионально
             }
             st.info(f"💰 {BUDGET_INFO[budget]}")
 
-            with st.spinner("Проверяем реалистичность цели..."):
-                realism_prompt = f"""Оцени, является ли цель физически достижимой для человека.
+            total_hours = hours * months * 4
 
-- Цель: {goal}
+            # Слой 1: жёсткий блок — физически невозможно что-то освоить
+            if total_hours < 8:
+                st.session_state.hours_blocked = True
+            else:
+                # Слой 2: мягкое предупреждение, флоу продолжается
+                if total_hours < 20:
+                    st.warning(f"⚠️ Суммарно {total_hours} ч за весь срок — это мало. Прогресс будет медленным, но реальным.")
 
-НЕРЕАЛИСТИЧНО — только если цель физически невозможна для человека ("летать без снаряжения", "стать суперменом", "телепортироваться", "жить вечно").
-Реальные профессии, навыки и карьерные цели — всегда РЕАЛИСТИЧНО, даже если путь долгий или сложный.
+                # Слой 3: GigaChat классифицирует цель по 3 категориям
+                with st.spinner("Проверяем реалистичность цели..."):
+                    realism_prompt = f"""Ты — эксперт по оценке карьерных целей. Классифицируй цель пользователя по одной из трёх категорий.
 
-Если реалистично — верни только слово: РЕАЛИСТИЧНО
-Если нет — верни: НЕРЕАЛИСТИЧНО
-И на следующей строке одно предложение: почему цель физически невозможна."""
+Цель: "{goal}"
 
-                raw = call_gigachat(realism_prompt)
-                if raw and "НЕРЕАЛИСТИЧНО" in raw:
-                    lines = raw.strip().splitlines()
-                    explanation = lines[1].strip() if len(lines) > 1 else "Цель физически невозможна для человека."
-                    st.session_state.realism_warning = explanation
-                else:
-                    generate_questions()
+КАТЕГОРИИ:
+1. РЕАЛИСТИЧНО — любой навык, профессия или карьерный рост, доступный через обучение: программирование, дизайн, маркетинг, иностранные языки, бизнес, медицина, юриспруденция, рабочие специальности и т.д. Сюда входят сложные и долгие пути (стать хирургом, юристом, архитектором, пилотом гражданской авиации).
 
+2. ИНСТИТУЦИОНАЛЬНЫЙ — профессия, требующая государственного отбора, секретного допуска или уникальной физической подготовки, которую НЕЛЬЗЯ пройти самостоятельно ни через какое обучение: космонавт, военный лётчик-истребитель, пилот Формулы-1, действующий президент страны, профессиональный олимпийский спортсмен высшего уровня. Онлайн-трек не откроет путь в саму профессию.
+
+3. НЕРЕАЛИСТИЧНО — цель физически невозможна для любого человека: летать без снаряжения, телепортироваться, жить вечно, стать суперменом.
+
+Верни ТОЛЬКО одно слово из трёх: РЕАЛИСТИЧНО, ИНСТИТУЦИОНАЛЬНЫЙ или НЕРЕАЛИСТИЧНО.
+Если ИНСТИТУЦИОНАЛЬНЫЙ — на следующей строке одно предложение: что конкретно требует эта профессия (государственный отбор / секретный допуск / и т.д.).
+Если НЕРЕАЛИСТИЧНО — на следующей строке одно предложение: почему физически невозможно.
+Не добавляй ничего лишнего."""
+
+                    raw = call_gigachat(realism_prompt)
+                    if raw:
+                        lines = raw.strip().splitlines()
+                        first_line = lines[0].strip()
+                        explanation = lines[1].strip() if len(lines) > 1 else ""
+
+                        if "НЕРЕАЛИСТИЧНО" in first_line:
+                            st.session_state.realism_warning = explanation or "Цель физически невозможна для человека."
+                        elif "ИНСТИТУЦИОНАЛЬНЫЙ" in first_line:
+                            st.session_state.institutional_warning = explanation or "Эта профессия требует официального государственного отбора."
+                        else:
+                            generate_questions()
+                    else:
+                        generate_questions()
+
+    # Слой 1: жёсткий блок по времени
+    if st.session_state.hours_blocked:
+        total_hours = st.session_state.hours * st.session_state.months * 4
+        st.error(
+            f"⛔ Слишком мало времени: {total_hours} ч за весь срок "
+            f"({st.session_state.hours} ч/нед × {st.session_state.months} мес). "
+            f"Для реального результата нужно минимум 8 часов суммарно."
+        )
+        if st.button("Скорректировать параметры"):
+            st.session_state.hours_blocked = False
+            st.rerun()
+
+    # Слой 3: институциональная профессия
+    if st.session_state.institutional_warning:
+        st.info(
+            f"ℹ️ {st.session_state.institutional_warning} "
+            f"Онлайн-трек покажет теоретическую базу и смежные навыки, "
+            f"но путь в профессию лежит через официальные институты."
+        )
+        col1, col2 = st.columns(2)
+        with col1:
+            if st.button("Посмотреть трек всё равно"):
+                st.session_state.institutional_warning = ""
+                generate_questions()
+        with col2:
+            if st.button("Скорректировать цель"):
+                st.session_state.institutional_warning = ""
+                st.rerun()
+
+    # Слой 3: физически невозможная цель
     if st.session_state.realism_warning:
         st.warning(f"⚠️ {st.session_state.realism_warning}")
         col1, col2 = st.columns(2)
