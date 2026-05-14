@@ -20,7 +20,7 @@ DEFAULT_STATE = [
     ("level", ""), ("qa_text", ""), ("realism_warning", ""),
     ("institutional_warning", ""), ("hours_blocked", False),
     ("track_result", ""), ("stepik_cache", []), ("stages", []),
-    ("last_submit_time", 0.0),
+    ("last_submit_time", 0.0), ("_pending_goal", ""),
 ]
 
 COOLDOWN = 15
@@ -122,7 +122,7 @@ if st.session_state.step == "input":
             st.warning("Цель должна содержать буквы, а не только цифры или символы!")
         else:
             st.session_state.last_submit_time = time.time()
-            st.session_state.goal = " ".join(goal.strip().split())
+            st.session_state._pending_goal = " ".join(goal.strip().split())
             st.session_state.hours = hours
             st.session_state.months = months
             st.session_state.budget = budget
@@ -162,19 +162,19 @@ if st.session_state.step == "input":
                     if "НЕРЕАЛИСТИЧНО" in first_line:
                         st.session_state.realism_warning = explanation or "Цель физически невозможна для человека."
                     elif "ИНСТИТУЦИОНАЛЬНЫЙ" in first_line:
+                        st.session_state.goal = st.session_state._pending_goal
                         st.session_state.institutional_warning = explanation or "Эта профессия требует официального государственного отбора."
                     else:
-                        # Цель реалистична — теперь проверяем параметры
-                        # Слой 1: жёсткий блок по времени
+                        st.session_state.goal = st.session_state._pending_goal
                         if total_hours < 8:
                             st.session_state.hours_blocked = True
                         else:
-                            # Слой 2: мягкое предупреждение, флоу продолжается
                             if total_hours < 20:
                                 st.warning(f"⚠️ Суммарно {total_hours} ч за весь срок — это мало. Прогресс будет медленным, но реальным.")
                             generate_questions()
                 else:
                     # GigaChat недоступен — проверяем только часы
+                    st.session_state.goal = st.session_state._pending_goal
                     if total_hours < 8:
                         st.session_state.hours_blocked = True
                     else:
@@ -217,6 +217,7 @@ if st.session_state.step == "input":
         col1, col2 = st.columns(2)
         with col1:
             if st.button("Продолжить всё равно"):
+                st.session_state.goal = st.session_state._pending_goal
                 st.session_state.realism_warning = ""
                 generate_questions()
         with col2:
