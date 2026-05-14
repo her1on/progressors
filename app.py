@@ -112,6 +112,9 @@ if st.session_state.step == "input":
         submitted = st.form_submit_button("Пройти диагностику 🎯")
 
     if submitted:
+        st.session_state.realism_warning = ""
+        st.session_state.institutional_warning = ""
+        st.session_state.hours_blocked = False
         now = time.time()
         elapsed = now - st.session_state.last_submit_time
         if elapsed < COOLDOWN:
@@ -126,9 +129,6 @@ if st.session_state.step == "input":
             st.session_state.hours = hours
             st.session_state.months = months
             st.session_state.budget = budget
-            st.session_state.realism_warning = ""
-            st.session_state.institutional_warning = ""
-            st.session_state.hours_blocked = False
 
             st.info(f"💰 {BUDGET_INFO[budget]}")
 
