@@ -1,9 +1,16 @@
+import os
 import streamlit as st
+from dotenv import load_dotenv
 
 from level import COURSES_BY_LEVEL, FIXED_OPTIONS, parse_questions, calculate_level
 from gigachat_client import call_gigachat
 from stepik import search_stepik_courses
 from urllib.parse import quote
+
+load_dotenv()
+if not os.getenv("GIGACHAT_AUTH_KEY"):
+    st.error("⛔ GIGACHAT_AUTH_KEY не найден. Создай файл .env и добавь ключ GigaChat.")
+    st.stop()
 
 for key, default in [
     ("step", "input"), ("goal", ""), ("hours", 10),
@@ -75,7 +82,7 @@ D) Занимаюсь на продвинутом/профессионально
         elif not any(c.isalpha() for c in goal):
             st.warning("Цель должна содержать буквы, а не только цифры или символы!")
         else:
-            st.session_state.goal = goal
+            st.session_state.goal = " ".join(goal.strip().split())
             st.session_state.hours = hours
             st.session_state.months = months
             st.session_state.budget = budget

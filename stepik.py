@@ -12,6 +12,7 @@ def search_stepik_courses(query: str, budget: int, limit: int = 5) -> list[dict[
     }
     try:
         response = requests.get(url, params=params, timeout=5)
+        response.raise_for_status()
         courses = response.json().get("courses", [])
     except Exception:
         return []
