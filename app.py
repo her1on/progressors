@@ -235,7 +235,25 @@ elif st.session_state.step == "result":
     weeks = months * 4
     limit = COURSES_BY_LEVEL[level]
 
+    BADGES = {
+        "Полный новичок": ("🔰", "Новичок",    "Ты в начале пути — самое интересное впереди!"),
+        "Базовые знания": ("📚", "Изучающий",  "Есть база — теперь время её закрепить."),
+        "Средний уровень":("⚡", "Практик",    "Уже есть опыт — пора выходить на новый уровень."),
+        "Продвинутый":    ("🏆", "Эксперт",    "Ты в топе — время делиться знаниями с другими."),
+    }
+    emoji, badge_title, badge_desc = BADGES[level]
+
     st.markdown(f"### 🎯 Цель: {goal}")
+    st.markdown(
+        f"""<div style="background:#1e1e2e;border-radius:12px;padding:16px 20px;display:flex;align-items:center;gap:16px;margin-bottom:8px">
+        <span style="font-size:2.5rem">{emoji}</span>
+        <div>
+            <div style="font-size:1.1rem;font-weight:700;color:#fff">{badge_title}</div>
+            <div style="color:#aaa;font-size:0.9rem">{badge_desc}</div>
+        </div>
+        </div>""",
+        unsafe_allow_html=True
+    )
     st.success(f"Твой уровень: **{level}**")
 
     col1, col2, col3 = st.columns(3)
