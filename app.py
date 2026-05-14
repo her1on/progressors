@@ -279,11 +279,6 @@ elif st.session_state.step == "result":
     col2.metric("Срок", f"{months} мес")
     col3.metric("Бюджет", "Бесплатно" if budget == 0 else f"{budget} ₽/мес")
 
-    if not st.session_state.stepik_cache:
-        with st.spinner("Ищем курсы на Stepik..."):
-            st.session_state.stepik_cache = search_stepik_courses(goal, budget, limit)
-    stepik_courses = st.session_state.stepik_cache
-
     rutube_url = f"https://rutube.ru/search/?query={quote(goal)}"
 
     if not st.session_state.track_result:
@@ -356,6 +351,12 @@ elif st.session_state.step == "result":
 
     result = st.session_state.track_result
     stages = st.session_state.stages
+
+    if not st.session_state.stepik_cache:
+        stepik_query = stages[0] if stages else goal
+        with st.spinner("Ищем курсы на Stepik..."):
+            st.session_state.stepik_cache = search_stepik_courses(stepik_query, budget, limit)
+    stepik_courses = st.session_state.stepik_cache
 
     st.markdown("---")
     st.markdown("## Твой персональный трек")
