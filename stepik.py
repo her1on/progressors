@@ -7,6 +7,7 @@ def search_stepik_courses(query: str, budget: int, limit: int = 5) -> list[dict[
         "search": query,
         "is_public": True,
         "is_archived": False,
+        "language": "ru",
         "page_size": 50
     }
     try:
