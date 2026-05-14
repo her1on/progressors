@@ -14,14 +14,44 @@ if not os.getenv("GIGACHAT_AUTH_KEY"):
     st.error("⛔ GIGACHAT_AUTH_KEY не найден. Создай файл .env и добавь ключ GigaChat.")
     st.stop()
 
-for key, default in [
+DEFAULT_STATE = [
     ("step", "input"), ("goal", ""), ("hours", 10),
     ("months", 3), ("budget", 0), ("questions", []),
     ("level", ""), ("qa_text", ""), ("realism_warning", ""),
     ("institutional_warning", ""), ("hours_blocked", False),
     ("track_result", ""), ("stepik_cache", []), ("stages", []),
-    ("last_submit_time", 0.0)
-]:
+    ("last_submit_time", 0.0),
+]
+
+COOLDOWN = 15
+
+BUDGET_INFO = {
+    0:     "**Бесплатно** — Rutube, бесплатные курсы на Stepik, открытая документация и GitHub. Прогресс возможен, но медленнее: меньше структуры и обратной связи.",
+    2500:  "**До 2 500 ₽/мес** — отдельные курсы на Stepik (500–1 500 ₽ за курс), электронные книги, недорогие подписки. Хватит на 1–2 полноценных курса в месяц.",
+    5000:  "**До 5 000 ₽/мес** — большинство курсов на российских платформах (Stepik, Hexlet, Яндекс Практикум базовый), 1–2 сессии с ментором, профессиональные инструменты и подписки.",
+    10000: "**До 10 000 ₽/мес** — полноценные программы Skillbox, GeekBrains, Яндекс Практикум, регулярный менторинг, онлайн-конференции и интенсивы. Максимальный выбор форматов.",
+}
+
+BADGES = {
+    "Полный новичок": ("🔰", "Новичок",   "Ты в начале пути — самое интересное впереди!"),
+    "Базовые знания": ("📚", "Изучающий", "Есть база — теперь время её закрепить."),
+    "Средний уровень":("⚡", "Практик",   "Уже есть опыт — пора выходить на новый уровень."),
+    "Продвинутый":    ("🏆", "Эксперт",   "Ты в топе — время делиться знаниями с другими."),
+}
+
+
+def _call_ai(prompt: str) -> str | None:
+    try:
+        return call_gigachat(prompt)
+    except Exception as e:
+        if "RateLimitError" in type(e).__name__:
+            st.error("Слишком много запросов к ИИ. Подожди немного и попробуй снова.")
+        else:
+            st.error(f"Ошибка при обращении к ИИ: {type(e).__name__}. Попробуй ещё раз.")
+        return None
+
+
+for key, default in DEFAULT_STATE:
     if key not in st.session_state:
         st.session_state[key] = default
 
@@ -70,7 +100,7 @@ D) Занимаюсь на продвинутом/профессионально
 Не добавляй пояснений, markdown-блоков, комментариев — только JSON-массив."""
 
         with st.spinner("Составляем вопросы для диагностики..."):
-            raw = call_gigachat(questions_prompt)
+            raw = _call_ai(questions_prompt)
             if raw is not None:
                 questions = parse_questions(raw)
                 if questions:
@@ -80,7 +110,6 @@ D) Занимаюсь на продвинутом/профессионально
                 else:
                     st.error("Не удалось сгенерировать вопросы. Попробуй ещё раз.")
 
-    COOLDOWN = 15
     if submitted:
         now = time.time()
         elapsed = now - st.session_state.last_submit_time
@@ -100,12 +129,6 @@ D) Занимаюсь на продвинутом/профессионально
             st.session_state.institutional_warning = ""
             st.session_state.hours_blocked = False
 
-            BUDGET_INFO = {
-                0:     "**Бесплатно** — Rutube, бесплатные курсы на Stepik, открытая документация и GitHub. Прогресс возможен, но медленнее: меньше структуры и обратной связи.",
-                2500:  "**До 2 500 ₽/мес** — отдельные курсы на Stepik (500–1 500 ₽ за курс), электронные книги, недорогие подписки. Хватит на 1–2 полноценных курса в месяц.",
-                5000:  "**До 5 000 ₽/мес** — большинство курсов на российских платформах (Stepik, Hexlet, Яндекс Практикум базовый), 1–2 сессии с ментором, профессиональные инструменты и подписки.",
-                10000: "**До 10 000 ₽/мес** — полноценные программы Skillbox, GeekBrains, Яндекс Практикум, регулярный менторинг, онлайн-конференции и интенсивы. Максимальный выбор форматов.",
-            }
             st.info(f"💰 {BUDGET_INFO[budget]}")
 
             total_hours = hours * months * 4
@@ -128,7 +151,7 @@ D) Занимаюсь на продвинутом/профессионально
 Если НЕРЕАЛИСТИЧНО — на следующей строке одно предложение: почему физически невозможно.
 Не добавляй ничего лишнего."""
 
-                raw = call_gigachat(realism_prompt)
+                raw = _call_ai(realism_prompt)
                 if raw:
                     lines = raw.strip().splitlines()
                     first_line = lines[0].strip()
@@ -235,12 +258,6 @@ elif st.session_state.step == "result":
     weeks = months * 4
     limit = COURSES_BY_LEVEL[level]
 
-    BADGES = {
-        "Полный новичок": ("🔰", "Новичок",    "Ты в начале пути — самое интересное впереди!"),
-        "Базовые знания": ("📚", "Изучающий",  "Есть база — теперь время её закрепить."),
-        "Средний уровень":("⚡", "Практик",    "Уже есть опыт — пора выходить на новый уровень."),
-        "Продвинутый":    ("🏆", "Эксперт",    "Ты в топе — время делиться знаниями с другими."),
-    }
     emoji, badge_title, badge_desc = BADGES[level]
 
     st.markdown(f"### 🎯 Цель: {goal}")
@@ -330,7 +347,7 @@ elif st.session_state.step == "result":
 Краткое описание карьерных перспектив после полного прохождения трека."""
 
         with st.spinner("ИИ строит твой персональный маршрут..."):
-            result = call_gigachat(prompt)
+            result = _call_ai(prompt)
             if result is None:
                 st.stop()
             st.session_state.track_result = result
@@ -385,14 +402,7 @@ elif st.session_state.step == "result":
 
     st.markdown("---")
     if st.button("🔄 Начать заново"):
-        for key, default in [
-            ("step", "input"), ("goal", ""), ("hours", 10),
-            ("months", 3), ("budget", 0), ("questions", []),
-            ("level", ""), ("qa_text", ""), ("realism_warning", ""),
-            ("institutional_warning", ""), ("hours_blocked", False),
-            ("track_result", ""), ("stepik_cache", []), ("stages", []),
-            ("last_submit_time", 0.0)
-        ]:
+        for key, default in DEFAULT_STATE:
             st.session_state[key] = default
         for key in list(st.session_state.keys()):
             if key.startswith("stage_"):
