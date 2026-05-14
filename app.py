@@ -1,5 +1,6 @@
 import os
 import re
+import time
 import streamlit as st
 from dotenv import load_dotenv
 
@@ -18,7 +19,8 @@ for key, default in [
     ("months", 3), ("budget", 0), ("questions", []),
     ("level", ""), ("qa_text", ""), ("realism_warning", ""),
     ("institutional_warning", ""), ("hours_blocked", False),
-    ("track_result", ""), ("stepik_cache", []), ("stages", [])
+    ("track_result", ""), ("stepik_cache", []), ("stages", []),
+    ("last_submit_time", 0.0)
 ]:
     if key not in st.session_state:
         st.session_state[key] = default
@@ -78,12 +80,18 @@ D) Занимаюсь на продвинутом/профессионально
                 else:
                     st.error("Не удалось сгенерировать вопросы. Попробуй ещё раз.")
 
+    COOLDOWN = 15
     if submitted:
-        if not goal.strip():
+        now = time.time()
+        elapsed = now - st.session_state.last_submit_time
+        if elapsed < COOLDOWN:
+            st.warning(f"⏳ Подожди ещё {int(COOLDOWN - elapsed)} сек. перед следующим запросом.")
+        elif not goal.strip():
             st.warning("Укажи, чему хочешь научиться!")
         elif not any(c.isalpha() for c in goal):
             st.warning("Цель должна содержать буквы, а не только цифры или символы!")
         else:
+            st.session_state.last_submit_time = time.time()
             st.session_state.goal = " ".join(goal.strip().split())
             st.session_state.hours = hours
             st.session_state.months = months
@@ -353,7 +361,8 @@ elif st.session_state.step == "result":
             ("months", 3), ("budget", 0), ("questions", []),
             ("level", ""), ("qa_text", ""), ("realism_warning", ""),
             ("institutional_warning", ""), ("hours_blocked", False),
-            ("track_result", ""), ("stepik_cache", []), ("stages", [])
+            ("track_result", ""), ("stepik_cache", []), ("stages", []),
+            ("last_submit_time", 0.0)
         ]:
             st.session_state[key] = default
         for key in list(st.session_state.keys()):
