@@ -8,7 +8,7 @@ def search_stepik_courses(query: str, budget: int, limit: int = 5) -> list[dict[
         "is_public": True,
         "is_archived": False,
         "language": "ru",
-        "page_size": 50
+        "page_size": 100
     }
     try:
         response = requests.get(url, params=params, timeout=5)
@@ -16,18 +16,31 @@ def search_stepik_courses(query: str, budget: int, limit: int = 5) -> list[dict[
     except Exception:
         return []
 
-    result = []
+    filtered = []
     for course in courses:
         price = float(course.get("price", 0) or 0)
+        learners = course.get("learners_count") or 0
+        title = course.get("title")
+
+        if not title:
+            continue
+        if learners == 0:
+            continue
         if budget == 0 and price > 0:
             continue
         if budget > 0 and price > budget:
             continue
-        result.append({
-            "title": course.get("title"),
+
+        filtered.append({
+            "title": title,
             "url": f"https://stepik.org/course/{course.get('id')}/promo",
-            "price": int(price)
+            "price": int(price),
+            "learners": learners
         })
-        if len(result) >= limit:
-            break
-    return result
+
+    filtered.sort(key=lambda c: c["learners"], reverse=True)
+
+    return [
+        {"title": c["title"], "url": c["url"], "price": c["price"]}
+        for c in filtered[:limit]
+    ]
