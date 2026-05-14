@@ -1,4 +1,5 @@
 import os
+import re
 import streamlit as st
 from dotenv import load_dotenv
 
@@ -16,7 +17,8 @@ for key, default in [
     ("step", "input"), ("goal", ""), ("hours", 10),
     ("months", 3), ("budget", 0), ("questions", []),
     ("level", ""), ("qa_text", ""), ("realism_warning", ""),
-    ("institutional_warning", ""), ("hours_blocked", False)
+    ("institutional_warning", ""), ("hours_blocked", False),
+    ("track_result", ""), ("stepik_cache", []), ("stages", [])
 ]:
     if key not in st.session_state:
         st.session_state[key] = default
@@ -233,12 +235,14 @@ elif st.session_state.step == "result":
     col2.metric("Срок", f"{months} мес")
     col3.metric("Бюджет", "Бесплатно" if budget == 0 else f"{budget} ₽/мес")
 
-    with st.spinner("Ищем курсы на Stepik..."):
-        stepik_courses = search_stepik_courses(goal, budget, limit)
+    if not st.session_state.stepik_cache:
+        with st.spinner("Ищем курсы на Stepik..."):
+            st.session_state.stepik_cache = search_stepik_courses(goal, budget, limit)
+    stepik_courses = st.session_state.stepik_cache
 
     rutube_url = f"https://rutube.ru/search/?query={quote(goal)}"
 
-    with st.spinner("ИИ строит твой персональный маршрут..."):
+    if not st.session_state.track_result:
         prompt = f"""Ты — персональный ИИ-навигатор по обучению. Составь детальный трек обучения для пользователя.
 
 Откажись составлять трек только если цель абстрактна и не подразумевает конкретных навыков ("стать богатым", "стать лучше", "стать счастливым"). Реальные профессии и навыки — всегда принимай.
@@ -265,7 +269,7 @@ elif st.session_state.step == "result":
 
 3. СТРУКТУРА ТРЕКА
    - Фазы: основы → практика → проект → результат
-   - НЕ добавляй никаких ссылок — они будут добавлены отдельно
+   - НЕ добавляй никаких ссылок — они будут показаны отдельно
    - Обязательный финальный проект или портфолио
 
 Профиль пользователя:
@@ -299,13 +303,35 @@ elif st.session_state.step == "result":
 ## 🎯 Итог
 Краткое описание карьерных перспектив после полного прохождения трека."""
 
-        result = call_gigachat(prompt)
-        if result is None:
-            st.stop()
+        with st.spinner("ИИ строит твой персональный маршрут..."):
+            result = call_gigachat(prompt)
+            if result is None:
+                st.stop()
+            st.session_state.track_result = result
+            st.session_state.stages = re.findall(r"## 📍 Этап \d+: (.+)", result)
+
+    result = st.session_state.track_result
+    stages = st.session_state.stages
 
     st.markdown("---")
     st.markdown("## Твой персональный трек")
+
+    if stages:
+        done = sum(1 for i in range(len(stages)) if st.session_state.get(f"stage_{i}", False))
+        st.progress(done / len(stages))
+        st.caption(f"{done} из {len(stages)} этапов пройдено")
+
     st.markdown(result)
+
+    if stages:
+        st.markdown("---")
+        st.markdown("### ✅ Отметь пройденные этапы")
+        for i, title in enumerate(stages):
+            st.checkbox(f"Этап {i + 1}: {title}", key=f"stage_{i}")
+
+        done = sum(1 for i in range(len(stages)) if st.session_state.get(f"stage_{i}", False))
+        if done == len(stages):
+            st.success("🎉 Поздравляем! Ты прошёл весь трек. Время двигаться дальше!")
 
     if stepik_courses:
         st.markdown("---")
@@ -326,7 +352,11 @@ elif st.session_state.step == "result":
             ("step", "input"), ("goal", ""), ("hours", 10),
             ("months", 3), ("budget", 0), ("questions", []),
             ("level", ""), ("qa_text", ""), ("realism_warning", ""),
-            ("institutional_warning", ""), ("hours_blocked", False)
+            ("institutional_warning", ""), ("hours_blocked", False),
+            ("track_result", ""), ("stepik_cache", []), ("stages", [])
         ]:
             st.session_state[key] = default
+        for key in list(st.session_state.keys()):
+            if key.startswith("stage_"):
+                del st.session_state[key]
         st.rerun()
