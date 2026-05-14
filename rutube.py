@@ -24,8 +24,8 @@ def search_rutube_videos(query: str, limit: int = 3) -> list[dict]:
             }
         )
         results = response.json().get("results", [])
-    except Exception:
-        return []
+    except Exception as e:
+        return [{"_error": str(e), "title": "", "url": "", "author": "", "duration": ""}]
 
     filtered = []
     for v in results:
