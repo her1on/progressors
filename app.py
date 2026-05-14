@@ -134,7 +134,7 @@ if st.session_state.step == "input":
 
             total_hours = hours * months * 4
 
-            # Слой 3 всегда первый: сначала проверяем саму цель
+            # Сначала проверяем саму цель, часы — только если цель реалистична
             with st.spinner("Проверяем реалистичность цели..."):
                 realism_prompt = f"""Ты — эксперт по оценке карьерных целей. Классифицируй цель пользователя по одной из трёх категорий.
 
@@ -360,8 +360,9 @@ elif st.session_state.step == "result":
     st.markdown("---")
     st.markdown("## Твой персональный трек")
 
+    done = sum(1 for i in range(len(stages)) if st.session_state.get(f"stage_{i}", False))
+
     if stages:
-        done = sum(1 for i in range(len(stages)) if st.session_state.get(f"stage_{i}", False))
         st.progress(done / len(stages))
         st.caption(f"{done} из {len(stages)} этапов пройдено")
 
@@ -383,10 +384,8 @@ elif st.session_state.step == "result":
         else:
             st.markdown(part)
 
-    if stages:
-        done = sum(1 for i in range(len(stages)) if st.session_state.get(f"stage_{i}", False))
-        if done == len(stages):
-            st.success("🎉 Поздравляем! Ты прошёл весь трек. Время двигаться дальше!")
+    if stages and done == len(stages):
+        st.success("🎉 Поздравляем! Ты прошёл весь трек. Время двигаться дальше!")
 
     if stepik_courses:
         st.markdown("---")
