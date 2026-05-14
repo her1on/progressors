@@ -23,7 +23,7 @@ st.subheader("Персональный трек онлайн-обучения")
 if st.session_state.step == "input":
     with st.form("user_profile"):
         st.markdown("### Расскажи о себе")
-        goal = st.text_input("Чему хочешь научиться?", placeholder="Например: Python-разработка, ML, веб-дизайн")
+        goal = st.text_input("Чему хочешь научиться?", placeholder="Например: Python-разработка, ML, веб-дизайн", max_chars=100)
         hours = st.slider("Сколько часов в неделю готов учиться?", 1, 40, 10)
         months = st.slider("За сколько месяцев хочешь достичь цели?", 1, 12, 3)
         budget = st.select_slider(
