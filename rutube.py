@@ -16,8 +16,12 @@ def search_rutube_videos(query: str, limit: int = 3) -> list[dict]:
         response = requests.get(
             "https://rutube.ru/api/search/video/",
             params={"query": query, "page": 1},
-            timeout=5,
-            headers={"User-Agent": "Mozilla/5.0"}
+            timeout=8,
+            headers={
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+                "Accept": "application/json",
+                "Accept-Language": "ru-RU,ru;q=0.9",
+            }
         )
         results = response.json().get("results", [])
     except Exception:
