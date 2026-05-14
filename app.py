@@ -3,7 +3,7 @@ import streamlit as st
 from level import COURSES_BY_LEVEL, FIXED_OPTIONS, parse_questions, calculate_level
 from gigachat_client import call_gigachat
 from stepik import search_stepik_courses
-from rutube import search_rutube_videos
+from urllib.parse import quote
 
 for key, default in [
     ("step", "input"), ("goal", ""), ("hours", 10),
@@ -220,8 +220,7 @@ elif st.session_state.step == "result":
     with st.spinner("Ищем курсы на Stepik..."):
         stepik_courses = search_stepik_courses(goal, budget, limit)
 
-    with st.spinner("Ищем видео на Rutube..."):
-        rutube_videos = search_rutube_videos(goal)
+    rutube_url = f"https://rutube.ru/search/?query={quote(goal)}"
 
     with st.spinner("ИИ строит твой персональный маршрут..."):
         prompt = f"""Ты — персональный ИИ-навигатор по обучению. Составь детальный трек обучения для пользователя.
@@ -301,13 +300,9 @@ elif st.session_state.step == "result":
     else:
         st.info("Курсы на Stepik по данной теме не найдены.")
 
-    if rutube_videos:
-        st.markdown("---")
-        st.markdown("## 🎬 Видео на Rutube по твоей теме")
-        for video in rutube_videos:
-            st.markdown(f"- [{video['title']}]({video['url']}) — {video['author']}, {video['duration']}")
-    else:
-        st.info("Видео на Rutube по данной теме не найдено.")
+    st.markdown("---")
+    st.markdown("## 🎬 Видео на Rutube")
+    st.markdown(f"[🔍 Найти видео по теме «{goal}» на Rutube]({rutube_url})")
 
     st.markdown("---")
     if st.button("🔄 Начать заново"):
