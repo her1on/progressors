@@ -20,7 +20,7 @@ DEFAULT_STATE = [
     ("level", ""), ("qa_text", ""), ("realism_warning", ""),
     ("institutional_warning", ""), ("hours_blocked", False),
     ("track_result", ""), ("stepik_cache", []), ("stages", []),
-    ("last_submit_time", 0.0), ("_pending_goal", ""),
+    ("last_submit_time", 0.0),
 ]
 
 COOLDOWN = 15
@@ -112,9 +112,6 @@ if st.session_state.step == "input":
         submitted = st.form_submit_button("Пройти диагностику 🎯")
 
     if submitted:
-        st.session_state.realism_warning = ""
-        st.session_state.institutional_warning = ""
-        st.session_state.hours_blocked = False
         now = time.time()
         elapsed = now - st.session_state.last_submit_time
         if elapsed < COOLDOWN:
@@ -125,10 +122,13 @@ if st.session_state.step == "input":
             st.warning("Цель должна содержать буквы, а не только цифры или символы!")
         else:
             st.session_state.last_submit_time = time.time()
-            st.session_state._pending_goal = " ".join(goal.strip().split())
+            st.session_state.goal = " ".join(goal.strip().split())
             st.session_state.hours = hours
             st.session_state.months = months
             st.session_state.budget = budget
+            st.session_state.realism_warning = ""
+            st.session_state.institutional_warning = ""
+            st.session_state.hours_blocked = False
 
             st.info(f"💰 {BUDGET_INFO[budget]}")
 
@@ -142,7 +142,6 @@ if st.session_state.step == "input":
 
 КАТЕГОРИИ:
 1. РЕАЛИСТИЧНО — любой навык, профессия или карьерный рост, доступный через обучение: программирование, дизайн, маркетинг, иностранные языки, бизнес, медицина, юриспруденция, рабочие специальности и т.д. Сюда входят сложные и долгие пути (стать хирургом, юристом, архитектором, пилотом гражданской авиации).
-Следующие технологии и языки — всегда РЕАЛИСТИЧНО, даже если содержат спецсимволы: C#, C++, F#, .NET, Node.js, Vue.js, React.js, Next.js, Nuxt.js, 1С.
 
 2. ИНСТИТУЦИОНАЛЬНЫЙ — профессия, требующая государственного отбора, секретного допуска или уникальной физической подготовки, которую НЕЛЬЗЯ пройти самостоятельно ни через какое обучение: космонавт, военный лётчик-истребитель, пилот Формулы-1, действующий президент страны, профессиональный олимпийский спортсмен высшего уровня. Онлайн-трек не откроет путь в саму профессию.
 
@@ -162,19 +161,19 @@ if st.session_state.step == "input":
                     if "НЕРЕАЛИСТИЧНО" in first_line:
                         st.session_state.realism_warning = explanation or "Цель физически невозможна для человека."
                     elif "ИНСТИТУЦИОНАЛЬНЫЙ" in first_line:
-                        st.session_state.goal = st.session_state._pending_goal
                         st.session_state.institutional_warning = explanation or "Эта профессия требует официального государственного отбора."
                     else:
-                        st.session_state.goal = st.session_state._pending_goal
+                        # Цель реалистична — теперь проверяем параметры
+                        # Слой 1: жёсткий блок по времени
                         if total_hours < 8:
                             st.session_state.hours_blocked = True
                         else:
+                            # Слой 2: мягкое предупреждение, флоу продолжается
                             if total_hours < 20:
                                 st.warning(f"⚠️ Суммарно {total_hours} ч за весь срок — это мало. Прогресс будет медленным, но реальным.")
                             generate_questions()
                 else:
                     # GigaChat недоступен — проверяем только часы
-                    st.session_state.goal = st.session_state._pending_goal
                     if total_hours < 8:
                         st.session_state.hours_blocked = True
                     else:
@@ -217,7 +216,6 @@ if st.session_state.step == "input":
         col1, col2 = st.columns(2)
         with col1:
             if st.button("Продолжить всё равно"):
-                st.session_state.goal = st.session_state._pending_goal
                 st.session_state.realism_warning = ""
                 generate_questions()
         with col2:
