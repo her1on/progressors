@@ -195,6 +195,10 @@ elif st.session_state.step == "quiz":
     st.markdown(f"**Тема:** {st.session_state.goal}")
     st.markdown("Ответь на вопросы — ИИ определит твой уровень автоматически.")
     st.markdown("---")
+    if st.button("← Назад"):
+        st.session_state.step = "input"
+        st.session_state.questions = []
+        st.rerun()
 
     for i, q in enumerate(st.session_state.questions):
         st.radio(f"**{i + 1}. {q['question']}**", FIXED_OPTIONS, key=f"q_{i}")
@@ -223,6 +227,11 @@ elif st.session_state.step == "result":
 
     st.markdown(f"### 🎯 Цель: {goal}")
     st.success(f"Твой уровень: **{level}**")
+
+    col1, col2, col3 = st.columns(3)
+    col1.metric("Часов в неделю", f"{hours} ч")
+    col2.metric("Срок", f"{months} мес")
+    col3.metric("Бюджет", "Бесплатно" if budget == 0 else f"{budget} ₽/мес")
 
     with st.spinner("Ищем курсы на Stepik..."):
         stepik_courses = search_stepik_courses(goal, budget, limit)
