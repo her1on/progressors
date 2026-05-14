@@ -1,3 +1,4 @@
 streamlit
 gigachat
 python-dotenv
+requests

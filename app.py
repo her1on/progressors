@@ -1,12 +1,8 @@
-import json
-import os
-import re
-import requests
 import streamlit as st
-from gigachat import GigaChat
-from dotenv import load_dotenv
 
-load_dotenv()
+from level import COURSES_BY_LEVEL, FIXED_OPTIONS, parse_questions, calculate_level
+from gigachat_client import call_gigachat
+from stepik import search_stepik_courses
 
 for key, default in [
     ("step", "input"), ("goal", ""), ("hours", 10),
@@ -15,98 +11,6 @@ for key, default in [
 ]:
     if key not in st.session_state:
         st.session_state[key] = default
-
-COURSES_BY_LEVEL = {
-    "Полный новичок": 5,
-    "Базовые знания": 4,
-    "Средний уровень": 3,
-    "Продвинутый": 2
-}
-
-VALID_LEVELS = ["Полный новичок", "Базовые знания", "Средний уровень", "Продвинутый"]
-
-FIXED_OPTIONS = [
-    "A) Никогда не пробовал / не слышал",
-    "B) Знаком в теории, но не практиковал",
-    "C) Практиковал, есть реальный опыт",
-    "D) Занимаюсь на продвинутом/профессиональном уровне"
-]
-
-
-def parse_questions(raw: str) -> list:
-    raw = re.sub(r"```(?:json)?\s*", "", raw).strip().replace("```", "")
-    match = re.search(r"\[.*\]", raw, re.DOTALL)
-    if not match:
-        return []
-    try:
-        data = json.loads(match.group())
-        if not isinstance(data, list) or not data:
-            return []
-        for item in data:
-            if "question" not in item:
-                return []
-        return data
-    except json.JSONDecodeError:
-        return []
-
-
-def calculate_level(answers: list) -> str:
-    score = sum(FIXED_OPTIONS.index(a) for a in answers)
-    if score <= 3:
-        return "Полный новичок"
-    elif score <= 6:
-        return "Базовые знания"
-    elif score <= 9:
-        return "Средний уровень"
-    return "Продвинутый"
-
-
-def call_gigachat(prompt: str) -> str | None:
-    try:
-        with GigaChat(
-            credentials=os.getenv("GIGACHAT_AUTH_KEY"),
-            scope="GIGACHAT_API_PERS",
-            verify_ssl_certs=False
-        ) as giga:
-            response = giga.chat(prompt)
-            return response.choices[0].message.content
-    except Exception as e:
-        if "RateLimitError" in type(e).__name__:
-            st.error("Слишком много запросов к ИИ. Подожди немного и попробуй снова.")
-        else:
-            st.error(f"Ошибка при обращении к ИИ: {type(e).__name__}. Попробуй ещё раз.")
-        return None
-
-
-def search_stepik_courses(query, budget, limit=5):
-    url = "https://stepik.org/api/courses"
-    params = {
-        "search": query,
-        "is_public": True,
-        "is_archived": False,
-        "page_size": 50
-    }
-    try:
-        response = requests.get(url, params=params, timeout=5)
-        courses = response.json().get("courses", [])
-    except Exception:
-        return []
-
-    result = []
-    for course in courses:
-        price = float(course.get("price", 0) or 0)
-        if budget == 0 and price > 0:
-            continue
-        if budget > 0 and price > budget:
-            continue
-        result.append({
-            "title": course.get("title"),
-            "url": f"https://stepik.org/course/{course.get('id')}/promo",
-            "price": int(price)
-        })
-        if len(result) >= limit:
-            break
-    return result
 
 
 st.set_page_config(page_title="Прогрессоры", page_icon="🚀", layout="centered")
