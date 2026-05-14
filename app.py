@@ -306,7 +306,11 @@ elif st.session_state.step == "result":
 
     st.markdown("---")
     if st.button("🔄 Начать заново"):
-        st.session_state.step = "input"
-        st.session_state.questions = []
-        st.session_state.level = ""
+        for key, default in [
+            ("step", "input"), ("goal", ""), ("hours", 10),
+            ("months", 3), ("budget", 0), ("questions", []),
+            ("level", ""), ("qa_text", ""), ("realism_warning", ""),
+            ("institutional_warning", ""), ("hours_blocked", False)
+        ]:
+            st.session_state[key] = default
         st.rerun()
