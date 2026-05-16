@@ -7,7 +7,7 @@ from dotenv import load_dotenv
 from level import COURSES_BY_LEVEL, FIXED_OPTIONS, parse_questions, calculate_level
 from gigachat_client import call_gigachat
 from stepik import search_stepik_courses
-from habr import search_habr_articles
+
 from urllib.parse import quote
 
 load_dotenv()
@@ -22,7 +22,7 @@ DEFAULT_STATE = [
     ("institutional_warning", ""), ("hours_blocked", False),
     ("track_result", ""), ("stepik_cache", []), ("stages", []),
     ("last_submit_time", 0.0), ("current_stage", 0), ("abstract_warning", ""),
-    ("platform_courses_cache", []), ("habr_cache", []),
+    ("platform_courses_cache", []),
 ]
 
 COOLDOWN = 15
@@ -399,11 +399,6 @@ Skillbox | Python-разработчик с нуля
             st.session_state.platform_courses_cache = courses
     platform_courses = st.session_state.platform_courses_cache
 
-    if not st.session_state.habr_cache:
-        with st.spinner("Ищем статьи на Habr..."):
-            st.session_state.habr_cache = search_habr_articles(goal)
-    habr_articles = st.session_state.habr_cache
-
     st.markdown("---")
     st.markdown("## Твой персональный трек")
 
@@ -535,11 +530,7 @@ Skillbox | Python-разработчик с нуля
         for c in platform_courses:
             st.markdown(f"- [{c['platform']} — {c['course']}]({c['url']})")
 
-    if habr_articles:
-        st.markdown("---")
-        st.markdown("## 📰 Статьи на Habr")
-        for article in habr_articles:
-            st.markdown(f"- [{article['title']}]({article['url']})")
+
 
     st.markdown("---")
     st.markdown("## 🎬 Видео на Rutube")
@@ -553,5 +544,4 @@ Skillbox | Python-разработчик с нуля
             if key.startswith("stage_") or key.startswith("task_"):
                 del st.session_state[key]
         st.session_state.platform_courses_cache = []
-        st.session_state.habr_cache = []
         st.rerun()
