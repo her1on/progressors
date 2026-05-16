@@ -486,8 +486,13 @@ Skillbox | Python-разработчик с нуля
 Задание: {st.session_state[task_key]}
 Ответ пользователя: {answer}
 
-Дай фидбек в 3-4 предложениях: что верно, что можно улучшить, ободряющий итог.
-Тон: поддерживающий и конкретный. Не начинай с общих слов типа «Отлично!»."""
+Структура ответа:
+1. Первая строка — только одно слово-вердикт: «Верно», «Частично» или «Неверно».
+2. Что именно правильно (если есть).
+3. Если ответ неверный или частичный — дай подробное правильное решение с пошаговым объяснением, как к нему прийти.
+4. Одно ободряющее предложение в конце.
+
+Тон: поддерживающий и конкретный. Не используй общие фразы типа «Молодец!» без объяснения."""
                                 with st.spinner("Проверяем ответ..."):
                                     feedback = _call_ai(feedback_prompt)
                                     if feedback:
@@ -498,7 +503,14 @@ Skillbox | Python-разработчик с нуля
 
                         if st.session_state.get(feedback_key):
                             st.markdown("**💬 Фидбек:**")
-                            st.success(st.session_state[feedback_key])
+                            fb = st.session_state[feedback_key]
+                            first_line = fb.split("\n")[0].strip().lower()
+                            if "верно" in first_line and "частично" not in first_line and "не" not in first_line:
+                                st.success(fb)
+                            elif "частично" in first_line:
+                                st.warning(fb)
+                            else:
+                                st.error(fb)
 
             if stage_index < len(stages) - 1:
                 st.markdown(
