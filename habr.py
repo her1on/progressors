@@ -26,8 +26,6 @@ def search_habr_articles(query: str, limit: int = 3) -> list[dict]:
         title = title_m.group(1).strip()
         url = link_m.group(1).replace("&amp;", "&").split("?utm_")[0]
 
-        if "/ru/articles/" not in url:
-            continue
         if any(kw in title.lower() for kw in PROMO_KEYWORDS):
             continue
 
