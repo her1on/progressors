@@ -25,7 +25,7 @@ def search_stepik_courses(query: str, budget: int, limit: int = 5) -> list[dict[
 
         if not title:
             continue
-        if learners == 0:
+        if price == 0 and learners == 0:
             continue
         if budget == 0 and price > 0:
             continue
