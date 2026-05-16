@@ -39,7 +39,7 @@ def search_stepik_courses(query: str, budget: int, limit: int = 5) -> list[dict[
             "learners": learners
         })
 
-    paid = sorted([c for c in filtered if c["price"] >= 500], key=lambda c: c["price"])[:2]
+    paid = sorted([c for c in filtered if c["price"] >= 500], key=lambda c: c["price"], reverse=True)[:2]
     free = sorted([c for c in filtered if c["price"] == 0], key=lambda c: c["learners"], reverse=True)
     result = paid + free
 
