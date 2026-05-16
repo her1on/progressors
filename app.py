@@ -409,6 +409,58 @@ A/B → пробел в знаниях, включи в трек. C/D → уже
                         st.session_state.current_stage = stage_index
                         st.rerun()
 
+                if not is_done:
+                    st.markdown("---")
+                    task_key = f"task_{stage_index}"
+                    feedback_key = f"task_feedback_{stage_index}"
+                    answer_key = f"task_answer_{stage_index}"
+
+                    if not st.session_state.get(task_key):
+                        if st.button("🎯 Получить задание", key=f"get_task_{stage_index}"):
+                            task_prompt = f"""Ты — преподаватель по теме «{goal}». Составь одно практическое задание для этапа «{title}».
+
+Уровень пользователя: {level}
+Краткое содержание этапа: {content[:400]}
+
+Требования:
+- Задание выполнимо текстом — не требует запуска кода или специального ПО
+- Проверяет понимание, а не просто знание определений
+- Чёткий вопрос или задача с понятным ожиданием ответа
+
+Напиши ТОЛЬКО текст задания, без вводных слов и пояснений."""
+                            with st.spinner("Составляем задание..."):
+                                task = _call_ai(task_prompt)
+                                if task:
+                                    st.session_state[task_key] = task.strip()
+                                    st.rerun()
+
+                    if st.session_state.get(task_key):
+                        st.markdown("**📝 Задание:**")
+                        st.info(st.session_state[task_key])
+                        st.text_area("Твой ответ:", key=answer_key, height=120)
+                        if st.button("✅ Проверить ответ", key=f"check_{stage_index}"):
+                            answer = st.session_state.get(answer_key, "").strip()
+                            if answer:
+                                feedback_prompt = f"""Ты — преподаватель по теме «{goal}». Оцени ответ пользователя.
+
+Уровень пользователя: {level}
+Задание: {st.session_state[task_key]}
+Ответ пользователя: {answer}
+
+Дай фидбек в 3-4 предложениях: что верно, что можно улучшить, ободряющий итог.
+Тон: поддерживающий и конкретный. Не начинай с общих слов типа «Отлично!»."""
+                                with st.spinner("Проверяем ответ..."):
+                                    feedback = _call_ai(feedback_prompt)
+                                    if feedback:
+                                        st.session_state[feedback_key] = feedback.strip()
+                                        st.rerun()
+                            else:
+                                st.warning("Введи ответ перед проверкой.")
+
+                        if st.session_state.get(feedback_key):
+                            st.markdown("**💬 Фидбек:**")
+                            st.success(st.session_state[feedback_key])
+
             if stage_index < len(stages) - 1:
                 st.markdown(
                     '<div style="display:flex;justify-content:center;margin:2px 0">'
@@ -442,6 +494,6 @@ A/B → пробел в знаниях, включи в трек. C/D → уже
         for key, default in DEFAULT_STATE:
             st.session_state[key] = default
         for key in list(st.session_state.keys()):
-            if key.startswith("stage_"):
+            if key.startswith("stage_") or key.startswith("task_"):
                 del st.session_state[key]
         st.rerun()
