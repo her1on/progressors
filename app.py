@@ -20,7 +20,7 @@ DEFAULT_STATE = [
     ("level", ""), ("qa_text", ""), ("realism_warning", ""),
     ("institutional_warning", ""), ("hours_blocked", False),
     ("track_result", ""), ("stepik_cache", []), ("stages", []),
-    ("last_submit_time", 0.0),
+    ("last_submit_time", 0.0), ("current_stage", 0),
 ]
 
 COOLDOWN = 15
@@ -364,6 +364,9 @@ elif st.session_state.step == "result":
     done = sum(1 for i in range(len(stages)) if st.session_state.get(f"stage_{i}", False))
     first_undone = next((i for i in range(len(stages)) if not st.session_state.get(f"stage_{i}", False)), len(stages))
 
+    if st.session_state.get(f"stage_{st.session_state.current_stage}", False):
+        st.session_state.current_stage = first_undone
+
     if stages:
         st.progress(done / len(stages))
         st.caption(f"{done} из {len(stages)} этапов пройдено")
@@ -378,7 +381,7 @@ elif st.session_state.step == "result":
             title = title_match.group(1).strip() if title_match else f"Этап {stage_index + 1}"
             content = part[part.index("\n"):].strip() if "\n" in part else ""
             is_done = st.session_state.get(f"stage_{stage_index}", False)
-            is_current = stage_index == first_undone
+            is_current = stage_index == st.session_state.current_stage
 
             if is_done:
                 bg, border, dot, label = "#0d2b0d", "#4CAF50", "🟢", "Пройдено"
@@ -399,6 +402,10 @@ elif st.session_state.step == "result":
             with st.expander("Подробнее →", expanded=is_current):
                 st.markdown(content)
                 st.checkbox("Отметить как пройденный", key=f"stage_{stage_index}")
+                if not is_done and not is_current:
+                    if st.button("Начать этот этап", key=f"start_{stage_index}"):
+                        st.session_state.current_stage = stage_index
+                        st.rerun()
 
             if stage_index < len(stages) - 1:
                 st.markdown(
