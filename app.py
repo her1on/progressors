@@ -21,6 +21,7 @@ DEFAULT_STATE = [
     ("institutional_warning", ""), ("hours_blocked", False),
     ("track_result", ""), ("stepik_cache", []), ("stages", []),
     ("last_submit_time", 0.0), ("current_stage", 0), ("abstract_warning", ""),
+    ("platform_courses_cache", []),
 ]
 
 COOLDOWN = 15
@@ -30,6 +31,13 @@ BUDGET_INFO = {
     2500:  "**До 2 500 ₽/мес** — отдельные курсы на Stepik (500–1 500 ₽ за курс), электронные книги, недорогие подписки. Хватит на 1–2 полноценных курса в месяц.",
     5000:  "**До 5 000 ₽/мес** — большинство курсов на российских платформах (Stepik, Hexlet, Яндекс Практикум базовый), 1–2 сессии с ментором, профессиональные инструменты и подписки.",
     10000: "**До 10 000 ₽/мес** — полноценные программы Skillbox, GeekBrains, Яндекс Практикум, регулярный менторинг, онлайн-конференции и интенсивы. Максимальный выбор форматов.",
+}
+
+PLATFORM_SEARCH_URLS = {
+    "Яндекс Практикум": "https://practicum.yandex.ru/catalog/?text={}",
+    "Skillbox":         "https://skillbox.ru/search/?q={}",
+    "GeekBrains":       "https://gb.ru/search?query={}",
+    "Hexlet":           "https://ru.hexlet.io/search?q={}",
 }
 
 BADGES = {
@@ -360,6 +368,36 @@ A/B → пробел в знаниях, включи в трек. C/D → уже
             st.session_state.stepik_cache = search_stepik_courses(stepik_query, budget, limit)
     stepik_courses = st.session_state.stepik_cache
 
+    if not st.session_state.platform_courses_cache:
+        platform_prompt = f"""Назови 2-3 реальных курса по теме «{goal}» с российских образовательных платформ.
+Платформы: Яндекс Практикум, Skillbox, GeekBrains, Hexlet.
+Верни ТОЛЬКО список строк в формате:
+Платформа | Название курса
+Пример:
+Яндекс Практикум | Python-разработчик
+Skillbox | Python-разработчик с нуля
+Только реальные существующие курсы. Без пояснений и лишнего текста."""
+        with st.spinner("Ищем курсы на крупных платформах..."):
+            raw = _call_ai(platform_prompt)
+            courses = []
+            if raw:
+                for line in raw.strip().splitlines():
+                    if "|" in line:
+                        parts = line.split("|", 1)
+                        if len(parts) == 2:
+                            platform = parts[0].strip()
+                            course_name = parts[1].strip()
+                            for p_name, url_template in PLATFORM_SEARCH_URLS.items():
+                                if p_name.lower() in platform.lower():
+                                    courses.append({
+                                        "platform": p_name,
+                                        "course": course_name,
+                                        "url": url_template.format(quote(course_name)),
+                                    })
+                                    break
+            st.session_state.platform_courses_cache = courses
+    platform_courses = st.session_state.platform_courses_cache
+
     st.markdown("---")
     st.markdown("## Твой персональный трек")
 
@@ -485,6 +523,12 @@ A/B → пробел в знаниях, включи в трек. C/D → уже
     else:
         st.info("Курсы на Stepik по данной теме не найдены.")
 
+    if platform_courses:
+        st.markdown("---")
+        st.markdown("## 🎓 Курсы на крупных платформах")
+        for c in platform_courses:
+            st.markdown(f"- [{c['platform']} — {c['course']}]({c['url']})")
+
     st.markdown("---")
     st.markdown("## 🎬 Видео на Rutube")
     st.markdown(f"[🔍 Найти видео по теме «{goal}» на Rutube]({rutube_url})")
@@ -496,4 +540,5 @@ A/B → пробел в знаниях, включи в трек. C/D → уже
         for key in list(st.session_state.keys()):
             if key.startswith("stage_") or key.startswith("task_"):
                 del st.session_state[key]
+        st.session_state.platform_courses_cache = []
         st.rerun()
