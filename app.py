@@ -363,7 +363,7 @@ A/B → пробел в знаниях, включи в трек. C/D → уже
     stages = st.session_state.stages
 
     if not st.session_state.stepik_cache:
-        stepik_query = f"{goal} {stages[0]}" if stages else goal
+        stepik_query = goal
         with st.spinner("Ищем курсы на Stepik..."):
             st.session_state.stepik_cache = search_stepik_courses(stepik_query, budget, limit)
     stepik_courses = st.session_state.stepik_cache
