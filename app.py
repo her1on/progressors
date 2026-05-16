@@ -510,7 +510,7 @@ Skillbox | Python-разработчик с нуля
                         if st.session_state.get(feedback_key):
                             st.markdown("**💬 Фидбек:**")
                             fb = st.session_state[feedback_key]
-                            verdict = fb.split("\n")[0].strip().rstrip(".!").lower()
+                            verdict = fb.split("\n")[0].strip().strip("*").rstrip(".!").lower()
                             if verdict == "верно":
                                 st.success(fb)
                             elif verdict == "частично":
