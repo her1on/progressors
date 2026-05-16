@@ -362,6 +362,7 @@ elif st.session_state.step == "result":
     st.markdown("## Твой персональный трек")
 
     done = sum(1 for i in range(len(stages)) if st.session_state.get(f"stage_{i}", False))
+    first_undone = next((i for i in range(len(stages)) if not st.session_state.get(f"stage_{i}", False)), len(stages))
 
     if stages:
         st.progress(done / len(stages))
@@ -377,10 +378,36 @@ elif st.session_state.step == "result":
             title = title_match.group(1).strip() if title_match else f"Этап {stage_index + 1}"
             content = part[part.index("\n"):].strip() if "\n" in part else ""
             is_done = st.session_state.get(f"stage_{stage_index}", False)
-            prefix = "✅" if is_done else "⚪"
-            with st.expander(f"{prefix} Этап {stage_index + 1}: {title}"):
+            is_current = stage_index == first_undone
+
+            if is_done:
+                bg, border, dot, label = "#0d2b0d", "#4CAF50", "🟢", "Пройдено"
+            elif is_current:
+                bg, border, dot, label = "#0d1b2b", "#2196F3", "🔵", "Текущий"
+            else:
+                bg, border, dot, label = "#1a1a2a", "#555555", "⚫", "Впереди"
+
+            st.markdown(
+                f"""<div style="background:{bg};border-left:4px solid {border};border-radius:8px;
+                padding:14px 18px;margin-bottom:2px;display:flex;justify-content:space-between;align-items:center">
+                <span style="font-weight:700;color:#fff">{dot} Этап {stage_index + 1}: {title}</span>
+                <span style="color:{border};font-size:0.8rem;font-weight:600">{label}</span>
+                </div>""",
+                unsafe_allow_html=True
+            )
+
+            with st.expander("Подробнее →", expanded=is_current):
                 st.markdown(content)
                 st.checkbox("Отметить как пройденный", key=f"stage_{stage_index}")
+
+            if stage_index < len(stages) - 1:
+                st.markdown(
+                    '<div style="display:flex;justify-content:center;margin:2px 0">'
+                    '<div style="width:3px;height:20px;background:#333;border-radius:2px"></div>'
+                    '</div>',
+                    unsafe_allow_html=True
+                )
+
             stage_index += 1
         else:
             st.markdown(part)
