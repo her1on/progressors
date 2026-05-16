@@ -349,7 +349,7 @@ A/B → пробел в знаниях, включи в трек. C/D → уже
             if result is None:
                 st.stop()
             st.session_state.track_result = result
-            st.session_state.stages = re.findall(r"## 📍 Этап \d+: (.+)", result)
+            st.session_state.stages = re.findall(r"##[^\n]*Этап \d+: (.+)", result)
 
     result = st.session_state.track_result
     stages = st.session_state.stages
@@ -378,8 +378,8 @@ A/B → пробел в знаниях, включи в трек. C/D → уже
 
     stage_index = 0
     for part in parts:
-        if part.startswith("## 📍 Этап"):
-            title_match = re.match(r"## 📍 Этап \d+: (.+)", part)
+        if re.match(r"##[^\n]*Этап \d+", part):
+            title_match = re.match(r"##[^\n]*Этап \d+: (.+)", part)
             title = title_match.group(1).strip() if title_match else f"Этап {stage_index + 1}"
             content = part[part.index("\n"):].strip() if "\n" in part else ""
             is_done = st.session_state.get(f"stage_{stage_index}", False)
