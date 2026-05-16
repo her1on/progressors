@@ -14,6 +14,8 @@ def search_habr_articles(query: str, limit: int = 3) -> list[dict]:
     except Exception:
         return []
 
+    PROMO_KEYWORDS = ("вебинар", "открытый урок", "регистрация", "старт потока", "старт курса")
+
     items = re.findall(r"<item>(.*?)</item>", r.text, re.DOTALL)
     results = []
     for item in items:
@@ -23,6 +25,12 @@ def search_habr_articles(query: str, limit: int = 3) -> list[dict]:
             continue
         title = title_m.group(1).strip()
         url = link_m.group(1).replace("&amp;", "&").split("?utm_")[0]
+
+        if "/ru/articles/" not in url:
+            continue
+        if any(kw in title.lower() for kw in PROMO_KEYWORDS):
+            continue
+
         results.append({"title": title, "url": url})
         if len(results) >= limit:
             break
