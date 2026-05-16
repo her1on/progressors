@@ -333,7 +333,7 @@ A/B → пробел в знаниях, включи в трек. C/D → уже
 Тон: простой и ободряющий для новичка, лаконичный и технический для продвинутого.
 
 ОГРАНИЧЕНИЯ:
-Платформы (только без VPN): Яндекс Практикум, GeekBrains, Skillbox, Hexlet, Habr, Rutube.
+Платформы (только без VPN): Яндекс Практикум, GeekBrains, Skillbox, Hexlet, Rutube.
 ЗАПРЕЩЕНО упоминать: Coursera, Udemy, edX, Skillshare, LinkedIn Learning, Khan Academy — недоступны из РФ.
 Если без иностранного ресурса не обойтись — добавь пометку [⚠️ нужен VPN или альтернативная оплата].
 Нагрузка: {hours} ч/нед, минимум 40% времени — практика. Ориентируйся на {weeks} недель (±20%).
@@ -504,10 +504,10 @@ Skillbox | Python-разработчик с нуля
                         if st.session_state.get(feedback_key):
                             st.markdown("**💬 Фидбек:**")
                             fb = st.session_state[feedback_key]
-                            first_line = fb.split("\n")[0].strip().lower()
-                            if "верно" in first_line and "частично" not in first_line and "не" not in first_line:
+                            verdict = fb.split("\n")[0].strip().rstrip(".!").lower()
+                            if verdict == "верно":
                                 st.success(fb)
-                            elif "частично" in first_line:
+                            elif verdict == "частично":
                                 st.warning(fb)
                             else:
                                 st.error(fb)
@@ -553,7 +553,7 @@ Skillbox | Python-разработчик с нуля
         for key, default in DEFAULT_STATE:
             st.session_state[key] = default
         for key in list(st.session_state.keys()):
-            if key.startswith("stage_") or key.startswith("task_"):
+            if key.startswith("stage_") or key.startswith("task_") or key.startswith("q_"):
                 del st.session_state[key]
         st.session_state.platform_courses_cache = []
         st.rerun()
