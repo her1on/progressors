@@ -1,0 +1,355 @@
+import os
+import re
+from urllib.parse import quote
+from pathlib import Path
+
+from fastapi import FastAPI, HTTPException
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
+from pydantic import BaseModel
+from dotenv import load_dotenv
+
+load_dotenv()
+
+from gigachat_client import call_gigachat
+from level import COURSES_BY_LEVEL, parse_questions, calculate_level
+from stepik import search_stepik_courses
+
+app = FastAPI(title="Прогрессоры API")
+
+PLATFORM_SEARCH_URLS = {
+    "Яндекс Практикум": "https://practicum.yandex.ru/catalog/?text={}",
+    "Skillbox":         "https://skillbox.ru/search/?q={}",
+    "GeekBrains":       "https://gb.ru/search?query={}",
+    "Hexlet":           "https://ru.hexlet.io/search?q={}",
+}
+
+PLAT_KEY = {
+    "Яндекс Практикум": "practicum",
+    "Skillbox":         "skillbox",
+    "GeekBrains":       "gb",
+    "Hexlet":           "hexlet",
+}
+
+PLANETS = ["earth", "mars", "jupiter", "neptune", "star"]
+
+# ── Pydantic models ──────────────────────────────────────────────────────────
+
+class GoalRequest(BaseModel):
+    goal: str
+
+class QuestionsRequest(BaseModel):
+    goal: str
+
+class TrackRequest(BaseModel):
+    goal: str
+    level: str
+    hours: int
+    months: int
+    budget: int
+    qa_text: str
+
+class TaskRequest(BaseModel):
+    goal: str
+    level: str
+    stage_title: str
+    stage_content: str
+
+class FeedbackRequest(BaseModel):
+    goal: str
+    level: str
+    task: str
+    answer: str
+
+# ── Track parser ─────────────────────────────────────────────────────────────
+
+def parse_track_to_stages(track_text: str, all_courses: list) -> list:
+    stages = []
+    parts = re.split(r"\n(?=##\s)", "\n" + track_text.strip())
+
+    for part in parts:
+        if not re.match(r"##[^\n]*Этап\s*\d+", part):
+            continue
+
+        idx = len(stages)
+
+        title_match = re.match(r"##[^\n]*Этап\s*\d+:\s*(.+)", part)
+        title = title_match.group(1).strip() if title_match else f"Этап {idx + 1}"
+
+        weeks_match = re.search(r"\*\*Длительность:\*\*\s*(\d+)", part)
+        weeks = int(weeks_match.group(1)) if weeks_match else 2
+
+        topics_match = re.search(r"\*\*Что изучать:\*\*(.+?)(?=\*\*Результат:|\Z)", part, re.DOTALL)
+        topics_text = topics_match.group(1).strip() if topics_match else ""
+
+        topics = []
+        for line in topics_text.splitlines():
+            line = line.strip().lstrip("-•*·").strip()
+            if len(line) > 5:
+                topics.append({"html": line})
+        if not topics and topics_text:
+            for item in re.split(r"[;,]", topics_text):
+                item = item.strip()
+                if len(item) > 5:
+                    topics.append({"html": item})
+
+        outcome_match = re.search(r"\*\*Результат:\*\*\s*(.+?)(?=\n##|\Z)", part, re.DOTALL)
+        outcome = outcome_match.group(1).strip().replace("\n", " ") if outcome_match else ""
+
+        summary = topics_text[:220].rstrip() + ("…" if len(topics_text) > 220 else "")
+
+        # 2 courses per stage from the global pool
+        stage_courses = all_courses[idx * 2:(idx + 1) * 2]
+
+        stage: dict = {
+            "id": idx + 1,
+            "planet": PLANETS[idx % len(PLANETS)],
+            "title": title,
+            "weeks": weeks,
+            "state": "locked" if idx > 0 else "current",
+            "summary": summary,
+            "topics": topics[:6],
+            "outcome": outcome,
+            "courses": stage_courses,
+            "task": "",
+        }
+        if idx == 4:
+            stage["final"] = True
+
+        stages.append(stage)
+
+    return stages
+
+# ── API endpoints ─────────────────────────────────────────────────────────────
+
+@app.post("/api/validate")
+async def validate_goal(req: GoalRequest):
+    goal = req.goal.strip()
+    if not goal or not any(c.isalpha() for c in goal):
+        return {"status": "invalid", "message": "Цель должна содержать буквы."}
+
+    prompt = f"""Ты — эксперт по оценке карьерных целей. Классифицируй цель пользователя.
+
+Цель: "{goal}"
+
+КАТЕГОРИИ:
+1. РЕАЛИСТИЧНО — любой конкретный навык, технология, профессия или дисциплина.
+2. АБСТРАКТНО — нет конкретного навыка: "стать лучше", "быть успешным", "стать богатым".
+3. ИНСТИТУЦИОНАЛЬНЫЙ — требует государственного отбора: космонавт, военный лётчик и т.п.
+4. НЕРЕАЛИСТИЧНО — физически невозможно для человека.
+
+Верни ТОЛЬКО одно слово: РЕАЛИСТИЧНО, АБСТРАКТНО, ИНСТИТУЦИОНАЛЬНЫЙ или НЕРЕАЛИСТИЧНО.
+Если не РЕАЛИСТИЧНО — на следующей строке одно предложение-объяснение."""
+
+    try:
+        raw = call_gigachat(prompt)
+        lines = raw.strip().splitlines()
+        first = lines[0].strip()
+        explanation = lines[1].strip() if len(lines) > 1 else ""
+
+        if "НЕРЕАЛИСТИЧНО" in first:
+            return {"status": "unrealistic", "message": explanation or "Цель физически невозможна."}
+        if "АБСТРАКТНО" in first:
+            return {"status": "abstract", "message": explanation or "Уточни цель — укажи конкретный навык."}
+        if "ИНСТИТУЦИОНАЛЬНЫЙ" in first:
+            return {"status": "institutional", "message": explanation}
+        return {"status": "ok"}
+    except Exception:
+        return {"status": "ok"}  # fail open
+
+
+@app.post("/api/questions")
+async def generate_questions(req: QuestionsRequest):
+    prompt = f"""Ты — эксперт по диагностике уровня знаний. Сгенерируй РОВНО 4 вопроса для оценки уровня пользователя по теме: "{req.goal}".
+
+Пользователь отвечает по шкале A/B/C/D. Формулируй: "Насколько ты знаком с...", "Как часто ты...", "В какой мере ты практиковал...".
+НЕ используй форму "Что такое...", "Какой...".
+
+Верни ТОЛЬКО валидный JSON без текста до или после:
+[
+  {{"question": "Текст вопроса"}},
+  {{"question": "Текст вопроса"}},
+  {{"question": "Текст вопроса"}},
+  {{"question": "Текст вопроса"}}
+]"""
+
+    try:
+        raw = call_gigachat(prompt)
+        questions = parse_questions(raw)
+        if not questions:
+            raise HTTPException(500, "Не удалось распарсить вопросы")
+        # Return in {q: ...} format matching the static QUESTIONS in data.js
+        return {"questions": [{"q": q["question"]} for q in questions]}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(500, str(e))
+
+
+@app.post("/api/track")
+async def generate_track(req: TrackRequest):
+    weeks = req.months * 4
+    limit = COURSES_BY_LEVEL.get(req.level, 3)
+
+    prompt = f"""Ты — персональный ИИ-навигатор по обучению. Составь детальный трек обучения.
+
+ПРОФИЛЬ:
+- Цель: {req.goal}
+- Уровень: {req.level}
+- Время: {req.hours} ч/нед, срок {req.months} мес ({weeks} нед)
+- Бюджет: {req.budget} руб/мес (0 = только бесплатное)
+
+Ответы диагностики:
+{req.qa_text}
+
+A/B → пробел, включи в трек. C/D → уже владеет, только углубляй.
+
+ОГРАНИЧЕНИЯ:
+Платформы без VPN: Яндекс Практикум, GeekBrains, Skillbox, Hexlet, Rutube.
+ЗАПРЕЩЕНО: Coursera, Udemy, edX, Skillshare, LinkedIn Learning.
+Нагрузка: {req.hours} ч/нед, минимум 40% — практика. Ориентируйся на {weeks} нед (±20%).
+Бюджет: строго {req.budget} руб/мес. При 0 — только бесплатные.
+Без ссылок и раздела Ресурсы.
+
+Составь РОВНО 5 этапов:
+
+## 📍 Этап 1: [Название]
+**Длительность:** X недель
+**Что изучать:** Конкретные понятия и инструменты. Каждый пункт с новой строки, начиная с дефиса.
+**Результат:** что умеет пользователь после этапа
+
+## 📍 Этап 2: [Название]
+...до Этапа 5. Последний — финальный проект / портфолио."""
+
+    try:
+        track_text = call_gigachat(prompt)
+    except Exception as e:
+        raise HTTPException(500, f"GigaChat error: {e}")
+
+    # Stepik courses
+    try:
+        stepik_raw = search_stepik_courses(req.goal, req.budget, limit)
+    except Exception:
+        stepik_raw = []
+
+    # Platform courses via GigaChat
+    plat_prompt = f"""Назови 2-3 реальных курса по теме «{req.goal}» с российских платформ.
+Платформы: Яндекс Практикум, Skillbox, GeekBrains, Hexlet.
+Формат строго: Платформа | Название курса
+Только реальные существующие курсы. Без пояснений."""
+
+    try:
+        plat_raw = call_gigachat(plat_prompt)
+    except Exception:
+        plat_raw = ""
+
+    all_courses = []
+
+    for c in stepik_raw:
+        all_courses.append({
+            "plat": "stepik",
+            "name": "Stepik",
+            "title": c["title"],
+            "price": c["price"],
+            "url": c["url"],
+        })
+
+    for line in plat_raw.strip().splitlines():
+        if "|" not in line:
+            continue
+        parts = line.split("|", 1)
+        if len(parts) != 2:
+            continue
+        platform, course_name = parts[0].strip(), parts[1].strip()
+        for p_name, url_tpl in PLATFORM_SEARCH_URLS.items():
+            if p_name.lower() in platform.lower():
+                all_courses.append({
+                    "plat": PLAT_KEY.get(p_name, "stepik"),
+                    "name": p_name,
+                    "title": course_name,
+                    "price": None,
+                    "url": url_tpl.format(quote(course_name)),
+                })
+                break
+
+    stages = parse_track_to_stages(track_text, all_courses)
+
+    if not stages:
+        raise HTTPException(500, "Не удалось распарсить трек. Попробуй ещё раз.")
+
+    return {"stages": stages}
+
+
+@app.post("/api/task")
+async def generate_task(req: TaskRequest):
+    prompt = f"""Ты — преподаватель по теме «{req.goal}». Составь одно практическое задание для этапа «{req.stage_title}».
+
+Уровень пользователя: {req.level}
+Содержание этапа: {req.stage_content[:400]}
+
+Требования:
+- Выполнимо текстом, без запуска кода и специального ПО
+- Проверяет понимание, а не знание определений
+- Чёткий вопрос с понятным ожидаемым ответом
+
+Напиши ТОЛЬКО текст задания, без вводных слов и пояснений."""
+
+    try:
+        task = call_gigachat(prompt)
+        return {"task": task.strip()}
+    except Exception as e:
+        raise HTTPException(500, str(e))
+
+
+@app.post("/api/feedback")
+async def check_feedback(req: FeedbackRequest):
+    if not req.answer.strip():
+        raise HTTPException(400, "Пустой ответ")
+
+    prompt = f"""Ты — преподаватель по теме «{req.goal}». Оцени ответ пользователя.
+
+Уровень: {req.level}
+Задание: {req.task}
+Ответ пользователя: {req.answer}
+
+Критерии вердикта (строго):
+- «Верно» — ответ решает задачу по существу: логика правильная, результат соответствует условию.
+- «Частично» — правильный подход, но есть существенные пропуски или неполнота.
+- «Неверно» — бессмысленный набор символов, случайный текст, неправильная логика.
+Бессмысленный или случайный текст (например «fafafa», «ааа», «не знаю») — всегда «Неверно».
+
+Структура ответа:
+1. Первая строка — только одно слово-вердикт: «Верно», «Частично» или «Неверно».
+2. Что именно правильно (если есть).
+3. Если неверно/частично — подробное правильное решение.
+4. Одно ободряющее предложение в конце."""
+
+    try:
+        fb = call_gigachat(prompt).strip()
+    except Exception as e:
+        raise HTTPException(500, str(e))
+
+    first_line = fb.split("\n")[0].strip().strip("*").rstrip(".!").lower()
+    if first_line == "верно":
+        verdict = "good"
+    elif first_line == "частично":
+        verdict = "warn"
+    else:
+        verdict = "bad"
+
+    return {"verdict": verdict, "text": fb}
+
+
+# ── Static files ──────────────────────────────────────────────────────────────
+
+STATIC_DIR = Path(__file__).parent / "static"
+STATIC_DIR.mkdir(exist_ok=True)
+
+app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
+
+@app.get("/")
+async def root():
+    index = STATIC_DIR / "index.html"
+    if not index.exists():
+        raise HTTPException(404, "index.html not found in static/")
+    return FileResponse(str(index))

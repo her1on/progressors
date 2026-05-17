@@ -1,0 +1,2992 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Прогрессоры — навигатор по обучению</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Manrope:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <style>
+/* ─── Прогрессоры • cosmic design system ───────────────────────────── */
+
+:root {
+  --bg-0: #05070f;
+  --bg-1: #0a0e1f;
+  --surf-1: rgba(20, 26, 51, 0.62);
+  --surf-2: rgba(28, 36, 68, 0.72);
+  --surf-glass: rgba(255, 255, 255, 0.04);
+  --border-soft: rgba(140, 160, 255, 0.10);
+  --border-hard: rgba(160, 180, 255, 0.22);
+
+  --fg: #e8eaf5;
+  --fg-soft: #b8bdd4;
+  --fg-mute: #6f7796;
+  --fg-faint: #4a5078;
+
+  /* accents — switchable via Tweaks */
+  --acc-1: #5cc7ff;     /* aurora cyan */
+  --acc-2: #8b6dff;     /* amethyst */
+  --acc-3: #f5c067;     /* supernova gold */
+  --acc-warn: #ff8a6e;
+  --acc-good: #6df0a8;
+
+  --grad-aurora: linear-gradient(135deg, #5cc7ff 0%, #8b6dff 60%, #f5c067 120%);
+
+  --ff-display: "Space Grotesk", "Manrope", system-ui, sans-serif;
+  --ff-ui: "Manrope", system-ui, sans-serif;
+  --ff-mono: "JetBrains Mono", ui-monospace, monospace;
+
+  --radius-sm: 8px;
+  --radius-md: 14px;
+  --radius-lg: 20px;
+  --radius-xl: 28px;
+
+  --stars-opacity: 0.85;
+}
+
+* { box-sizing: border-box; }
+
+html, body, #root {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  width: 100%;
+}
+
+body {
+  font-family: var(--ff-ui);
+  color: var(--fg);
+  background: var(--bg-0);
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+}
+
+button { font-family: inherit; cursor: pointer; }
+input, textarea { font-family: inherit; color: inherit; }
+a { color: inherit; text-decoration: none; }
+
+/* ─── starfield background ─────────────────────────────────────────── */
+.cosmos {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse 80% 60% at 70% -10%, rgba(139, 109, 255, 0.22), transparent 70%),
+    radial-gradient(ellipse 60% 50% at 10% 110%, rgba(92, 199, 255, 0.18), transparent 70%),
+    radial-gradient(ellipse 40% 30% at 90% 60%, rgba(245, 192, 103, 0.07), transparent 70%),
+    var(--bg-0);
+}
+
+.cosmos::before,
+.cosmos::after {
+  content: "";
+  position: absolute;
+  inset: -10%;
+  background-image:
+    radial-gradient(1px 1px at 10% 20%, rgba(255,255,255,0.9), transparent 50%),
+    radial-gradient(1px 1px at 80% 15%, rgba(255,255,255,0.7), transparent 50%),
+    radial-gradient(1.5px 1.5px at 45% 65%, rgba(255,255,255,0.85), transparent 50%),
+    radial-gradient(1px 1px at 25% 85%, rgba(255,255,255,0.6), transparent 50%),
+    radial-gradient(1px 1px at 60% 35%, rgba(255,255,255,0.8), transparent 50%),
+    radial-gradient(1.5px 1.5px at 90% 80%, rgba(255,255,255,0.7), transparent 50%),
+    radial-gradient(1px 1px at 35% 10%, rgba(255,255,255,0.6), transparent 50%),
+    radial-gradient(1px 1px at 70% 90%, rgba(255,255,255,0.55), transparent 50%),
+    radial-gradient(1px 1px at 15% 55%, rgba(255,255,255,0.7), transparent 50%),
+    radial-gradient(2px 2px at 50% 25%, rgba(255,255,255,0.95), transparent 50%);
+  background-size: 600px 600px;
+  background-repeat: repeat;
+  opacity: var(--stars-opacity);
+}
+.cosmos::after {
+  background-size: 380px 380px;
+  opacity: calc(var(--stars-opacity) * 0.55);
+  animation: drift 240s linear infinite;
+}
+@keyframes drift {
+  from { transform: translate3d(0,0,0); }
+  to   { transform: translate3d(-380px,-380px,0); }
+}
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
+/* ─── app shell ────────────────────────────────────────────────────── */
+.app {
+  position: relative;
+  z-index: 1;
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 18px 32px;
+  background: linear-gradient(180deg, rgba(5,7,15,0.92), rgba(5,7,15,0.55) 70%, transparent);
+  backdrop-filter: blur(8px);
+}
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-family: var(--ff-display);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+.brand-mark {
+  width: 28px; height: 28px;
+  border-radius: 50%;
+  background: var(--grad-aurora);
+  box-shadow:
+    0 0 0 1px rgba(255,255,255,0.15) inset,
+    0 0 24px rgba(139,109,255,0.6),
+    0 0 60px rgba(92,199,255,0.35);
+  position: relative;
+}
+.brand-mark::after {
+  content: "";
+  position: absolute;
+  inset: 6px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 30% 30%, rgba(255,255,255,0.9), transparent 60%);
+  mix-blend-mode: screen;
+}
+.brand-name { font-size: 17px; }
+.brand-tag {
+  font-family: var(--ff-mono);
+  font-size: 11px;
+  color: var(--fg-mute);
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  padding-left: 12px;
+  margin-left: 4px;
+  border-left: 1px solid var(--border-soft);
+}
+
+.topbar-right {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  font-family: var(--ff-mono);
+  font-size: 12px;
+  color: var(--fg-mute);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.dot { width: 6px; height: 6px; border-radius: 50%; background: var(--acc-good); box-shadow: 0 0 10px var(--acc-good); display: inline-block; margin-right: 8px; }
+
+/* ─── typography utilities ─────────────────────────────────────────── */
+.eyebrow {
+  font-family: var(--ff-mono);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--fg-mute);
+}
+.display-1 {
+  font-family: var(--ff-display);
+  font-weight: 600;
+  font-size: 64px;
+  line-height: 1.02;
+  letter-spacing: -0.025em;
+  margin: 0;
+}
+.display-2 {
+  font-family: var(--ff-display);
+  font-weight: 600;
+  font-size: 40px;
+  line-height: 1.05;
+  letter-spacing: -0.02em;
+  margin: 0;
+}
+.display-3 {
+  font-family: var(--ff-display);
+  font-weight: 600;
+  font-size: 28px;
+  line-height: 1.15;
+  letter-spacing: -0.015em;
+  margin: 0;
+}
+.lede {
+  color: var(--fg-soft);
+  font-size: 18px;
+  line-height: 1.5;
+  max-width: 56ch;
+}
+
+/* ─── buttons ──────────────────────────────────────────────────────── */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 22px;
+  border-radius: 999px;
+  font-weight: 600;
+  font-size: 15px;
+  border: 1px solid var(--border-hard);
+  background: var(--surf-1);
+  color: var(--fg);
+  transition: transform 0.15s ease, background 0.2s ease, border-color 0.2s ease;
+}
+.btn:hover { background: var(--surf-2); border-color: rgba(180,200,255,0.35); }
+.btn:active { transform: translateY(1px); }
+.btn-primary {
+  background: var(--grad-aurora);
+  color: #0a0e1f;
+  border-color: transparent;
+  box-shadow: 0 8px 32px rgba(139,109,255,0.35), 0 0 0 1px rgba(255,255,255,0.08) inset;
+}
+.btn-primary:hover { filter: brightness(1.05); background: var(--grad-aurora); }
+.btn-ghost {
+  background: transparent;
+  border-color: var(--border-soft);
+  color: var(--fg-soft);
+}
+.btn-ghost:hover { color: var(--fg); }
+.btn-sm { padding: 9px 14px; font-size: 13px; }
+
+/* ─── card / panel ─────────────────────────────────────────────────── */
+.panel {
+  background: var(--surf-1);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-lg);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+}
+.panel-pad { padding: 28px 32px; }
+
+/* ─── input screen ─────────────────────────────────────────────────── */
+.input-screen {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 1.05fr 0.95fr;
+  gap: 48px;
+  padding: 40px 80px 80px;
+  align-items: center;
+  max-width: 1440px;
+  width: 100%;
+  margin: 0 auto;
+}
+.intro-side { max-width: 540px; }
+.intro-eyebrow-row { display: flex; align-items: center; gap: 14px; margin-bottom: 24px; }
+.glyph-divider { width: 40px; height: 1px; background: linear-gradient(90deg, transparent, var(--fg-faint), transparent); }
+.intro-side h1 { margin-bottom: 20px; }
+.aurora-text {
+  background: var(--grad-aurora);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+.intro-bullets {
+  margin: 36px 0 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 16px;
+}
+.intro-bullets li {
+  display: grid;
+  grid-template-columns: 28px 1fr;
+  gap: 14px;
+  color: var(--fg-soft);
+  font-size: 15px;
+  line-height: 1.45;
+}
+.intro-bullets b { color: var(--fg); font-weight: 600; }
+.intro-bullets .num {
+  font-family: var(--ff-mono);
+  font-size: 11px;
+  color: var(--acc-1);
+  letter-spacing: 0.1em;
+  border: 1px solid rgba(92,199,255,0.4);
+  border-radius: 999px;
+  width: 26px; height: 26px;
+  display: grid; place-items: center;
+  background: rgba(92,199,255,0.06);
+}
+
+/* form */
+.form-card {
+  display: grid;
+  gap: 22px;
+}
+.field { display: grid; gap: 10px; }
+.field-label {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-size: 13px;
+  color: var(--fg-soft);
+  font-weight: 500;
+}
+.field-label .hint { font-family: var(--ff-mono); font-size: 11px; color: var(--fg-mute); letter-spacing: 0.06em; }
+
+.input {
+  width: 100%;
+  padding: 16px 18px;
+  background: rgba(255,255,255,0.02);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-md);
+  color: var(--fg);
+  font-size: 16px;
+  outline: none;
+  transition: border-color 0.2s ease, background 0.2s ease;
+}
+.input::placeholder { color: var(--fg-faint); }
+.input:focus { border-color: var(--acc-1); background: rgba(92,199,255,0.04); box-shadow: 0 0 0 4px rgba(92,199,255,0.08); }
+
+/* custom slider */
+.slider-wrap {
+  display: grid;
+  gap: 6px;
+}
+.slider {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 28px;
+  background: transparent;
+  position: relative;
+}
+.slider::-webkit-slider-runnable-track {
+  height: 4px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, var(--acc-1) 0%, var(--acc-1) var(--p,50%), rgba(255,255,255,0.08) var(--p,50%), rgba(255,255,255,0.08) 100%);
+}
+.slider::-moz-range-track {
+  height: 4px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, var(--acc-1) 0%, var(--acc-1) var(--p,50%), rgba(255,255,255,0.08) var(--p,50%), rgba(255,255,255,0.08) 100%);
+}
+.slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 18px; height: 18px;
+  border-radius: 50%;
+  margin-top: -7px;
+  background: #fff;
+  box-shadow: 0 0 0 4px rgba(92,199,255,0.25), 0 0 12px var(--acc-1);
+  cursor: grab;
+}
+.slider::-moz-range-thumb {
+  width: 18px; height: 18px; border: none;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 0 0 4px rgba(92,199,255,0.25), 0 0 12px var(--acc-1);
+  cursor: grab;
+}
+.slider-ticks {
+  display: flex;
+  justify-content: space-between;
+  font-family: var(--ff-mono);
+  font-size: 10px;
+  color: var(--fg-mute);
+  letter-spacing: 0.08em;
+}
+
+/* budget segmented */
+.segmented {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+  background: rgba(255,255,255,0.02);
+  border: 1px solid var(--border-soft);
+  border-radius: 14px;
+  padding: 4px;
+}
+.segmented button {
+  padding: 12px 8px;
+  border-radius: 10px;
+  background: transparent;
+  border: none;
+  color: var(--fg-soft);
+  font-size: 13px;
+  font-weight: 500;
+  transition: all 0.18s ease;
+}
+.segmented button[data-active="true"] {
+  background: rgba(255,255,255,0.06);
+  color: var(--fg);
+  box-shadow: 0 0 0 1px var(--border-hard) inset;
+}
+.budget-note {
+  margin-top: 4px;
+  font-size: 13px;
+  color: var(--fg-soft);
+  padding: 14px 16px;
+  background: rgba(92,199,255,0.05);
+  border: 1px solid rgba(92,199,255,0.15);
+  border-radius: var(--radius-md);
+  line-height: 1.5;
+}
+.budget-note b { color: var(--acc-1); font-weight: 600; }
+
+/* alert */
+.alert {
+  display: flex;
+  gap: 12px;
+  padding: 14px 16px;
+  border-radius: var(--radius-md);
+  font-size: 14px;
+  line-height: 1.45;
+}
+.alert-warn { background: rgba(255,138,110,0.07); border: 1px solid rgba(255,138,110,0.25); color: #ffc7b6; }
+
+/* ─── quiz screen ──────────────────────────────────────────────────── */
+.quiz {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 320px 1fr;
+  gap: 48px;
+  padding: 40px 80px 60px;
+  max-width: 1440px;
+  width: 100%;
+  margin: 0 auto;
+}
+.quiz-aside {
+  position: sticky;
+  top: 90px;
+  align-self: start;
+}
+.quiz-progress {
+  display: grid;
+  gap: 18px;
+}
+.quiz-progress-bar {
+  display: flex;
+  gap: 6px;
+}
+.quiz-progress-bar i {
+  flex: 1;
+  height: 4px;
+  border-radius: 2px;
+  background: rgba(255,255,255,0.07);
+  transition: background 0.3s ease, box-shadow 0.3s ease;
+}
+.quiz-progress-bar i[data-done="true"] {
+  background: var(--acc-1);
+  box-shadow: 0 0 12px var(--acc-1);
+}
+.quiz-progress-bar i[data-current="true"] {
+  background: linear-gradient(90deg, var(--acc-1), rgba(92,199,255,0.2));
+  box-shadow: 0 0 12px var(--acc-1);
+}
+.quiz-meta {
+  display: grid;
+  gap: 10px;
+  font-size: 14px;
+  color: var(--fg-soft);
+}
+.quiz-meta .row { display: flex; justify-content: space-between; }
+.quiz-meta .row span:last-child { color: var(--fg); font-weight: 600; }
+
+.quiz-questions {
+  display: grid;
+  gap: 18px;
+}
+.qcard {
+  padding: 28px 32px;
+}
+.qcard-num {
+  font-family: var(--ff-mono);
+  font-size: 11px;
+  color: var(--fg-mute);
+  letter-spacing: 0.16em;
+  margin-bottom: 8px;
+}
+.qcard-text {
+  font-family: var(--ff-display);
+  font-size: 22px;
+  font-weight: 500;
+  line-height: 1.25;
+  margin: 0 0 22px;
+  letter-spacing: -0.01em;
+}
+.qoptions { display: grid; gap: 10px; }
+.qopt {
+  display: grid;
+  grid-template-columns: 32px 1fr;
+  gap: 14px;
+  align-items: center;
+  padding: 14px 18px;
+  border-radius: var(--radius-md);
+  background: rgba(255,255,255,0.02);
+  border: 1px solid var(--border-soft);
+  cursor: pointer;
+  transition: all 0.16s ease;
+  text-align: left;
+  color: var(--fg-soft);
+  font-size: 15px;
+}
+.qopt:hover { border-color: var(--border-hard); color: var(--fg); }
+.qopt[data-selected="true"] {
+  background: rgba(92,199,255,0.08);
+  border-color: rgba(92,199,255,0.5);
+  color: var(--fg);
+  box-shadow: 0 0 0 1px rgba(92,199,255,0.3) inset, 0 8px 28px rgba(92,199,255,0.12);
+}
+.qopt-key {
+  width: 28px; height: 28px;
+  display: grid; place-items: center;
+  border-radius: 50%;
+  border: 1px solid var(--border-soft);
+  font-family: var(--ff-mono);
+  font-size: 12px;
+  color: var(--fg-mute);
+  background: rgba(0,0,0,0.2);
+}
+.qopt[data-selected="true"] .qopt-key {
+  border-color: var(--acc-1);
+  color: var(--acc-1);
+  background: rgba(92,199,255,0.1);
+}
+.quiz-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 8px;
+}
+.quiz-footer .progress-text { color: var(--fg-mute); font-family: var(--ff-mono); font-size: 12px; letter-spacing: 0.08em; }
+
+/* ─── reveal screen ────────────────────────────────────────────────── */
+.reveal {
+  flex: 1;
+  display: grid;
+  place-items: center;
+  padding: 60px 40px;
+  text-align: center;
+}
+.reveal-inner { max-width: 640px; }
+.reveal-eyebrow { margin-bottom: 28px; }
+.badge-orb {
+  width: 240px;
+  height: 240px;
+  margin: 0 auto 44px;
+  position: relative;
+  animation: orbFloat 6s ease-in-out infinite;
+}
+@keyframes orbFloat {
+  0%,100% { transform: translateY(0); }
+  50% { transform: translateY(-8px); }
+}
+.badge-corona {
+  position: absolute;
+  inset: -10px;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle, rgba(255,200,100,0.5) 0%, rgba(255,150,80,0.22) 35%, transparent 62%);
+  filter: blur(16px);
+  animation: corona-breath 5s ease-in-out infinite;
+}
+.badge-corona::before {
+  content: "";
+  position: absolute;
+  inset: -20px;
+  border-radius: 50%;
+  background: conic-gradient(from 0deg,
+    rgba(255,200,100,0)   0%,
+    rgba(255,200,100,0.55) 6%,
+    rgba(255,200,100,0)   13%,
+    rgba(255,200,100,0)   28%,
+    rgba(255,200,100,0.5) 35%,
+    rgba(255,200,100,0)   42%,
+    rgba(255,200,100,0)   60%,
+    rgba(255,200,100,0.55) 67%,
+    rgba(255,200,100,0)   74%,
+    rgba(255,200,100,0)   100%);
+  filter: blur(8px);
+  animation: spin 28s linear infinite;
+}
+.badge-corona::after {
+  content: "";
+  position: absolute;
+  inset: -32px;
+  border-radius: 50%;
+  border: 1px dashed rgba(245,192,103,0.35);
+  animation: spin 60s linear infinite reverse;
+}
+.badge-orb-icon {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font-family: var(--ff-display);
+  font-weight: 700;
+  font-size: 88px;
+  color: #fff;
+  text-shadow: 0 4px 28px rgba(0,0,0,0.5), 0 0 18px rgba(255,210,140,0.5);
+  z-index: 2;
+}
+.reveal-level {
+  font-family: var(--ff-mono);
+  font-size: 12px;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: var(--acc-3);
+  margin-bottom: 10px;
+}
+.reveal-title { margin-bottom: 18px; }
+.reveal-desc { color: var(--fg-soft); font-size: 17px; line-height: 1.5; margin: 0 auto 36px; max-width: 480px; }
+.reveal-stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  margin: 0 auto 40px;
+  max-width: 560px;
+}
+.reveal-stat {
+  padding: 16px 18px;
+  background: var(--surf-1);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-md);
+  text-align: left;
+}
+.reveal-stat .k { font-family: var(--ff-mono); font-size: 10px; letter-spacing: 0.16em; color: var(--fg-mute); text-transform: uppercase; }
+.reveal-stat .v { font-family: var(--ff-display); font-size: 22px; font-weight: 600; color: var(--fg); margin-top: 4px; letter-spacing: -0.01em; }
+
+/* ─── track screen ─────────────────────────────────────────────────── */
+.track {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 1fr;
+  max-width: 1440px;
+  width: 100%;
+  margin: 0 auto;
+  padding: 24px 40px 60px;
+  gap: 24px;
+}
+.track-header {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 28px;
+  align-items: end;
+  padding: 8px 4px;
+}
+.track-header-left h2 { margin-bottom: 10px; }
+.track-meta-row {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  color: var(--fg-soft);
+  font-size: 14px;
+  flex-wrap: wrap;
+}
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  background: rgba(255,255,255,0.03);
+  border: 1px solid var(--border-soft);
+  border-radius: 999px;
+  font-family: var(--ff-mono);
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--fg-soft);
+}
+.chip-lvl { color: var(--acc-3); border-color: rgba(245,192,103,0.3); background: rgba(245,192,103,0.06); }
+
+.track-progress {
+  min-width: 260px;
+  text-align: right;
+}
+.track-progress .pct {
+  font-family: var(--ff-display);
+  font-size: 36px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  background: var(--grad-aurora);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+.track-progress .label { font-family: var(--ff-mono); font-size: 11px; color: var(--fg-mute); letter-spacing: 0.16em; text-transform: uppercase; }
+.track-progress-bar {
+  margin-top: 10px;
+  height: 4px;
+  width: 100%;
+  background: rgba(255,255,255,0.06);
+  border-radius: 2px;
+  overflow: hidden;
+}
+.track-progress-bar i {
+  display: block;
+  height: 100%;
+  background: var(--grad-aurora);
+  border-radius: 2px;
+  box-shadow: 0 0 18px rgba(139,109,255,0.5);
+  transition: width 0.5s ease;
+}
+
+.track-body {
+  display: grid;
+  grid-template-columns: 360px 1fr;
+  gap: 32px;
+}
+
+/* constellation */
+.constellation {
+  position: relative;
+  padding: 8px 0 32px;
+}
+.constellation-svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 0;
+}
+.constellation-nodes {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  gap: 28px;
+}
+.cnode {
+  display: grid;
+  grid-template-columns: 64px 1fr;
+  gap: 18px;
+  align-items: center;
+  padding: 10px 14px 10px 4px;
+  border-radius: 18px;
+  background: transparent;
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-align: left;
+}
+.cnode:hover { background: rgba(255,255,255,0.025); border-color: var(--border-soft); }
+.cnode[data-active="true"] {
+  background: linear-gradient(90deg, rgba(92,199,255,0.10), rgba(92,199,255,0));
+  border-color: rgba(92,199,255,0.25);
+}
+/* ─── realistic animated planets ─────────────────────────────────── */
+.planet-shell {
+  width: 56px;
+  height: 56px;
+  position: relative;
+  margin: 4px;
+  flex-shrink: 0;
+}
+.planet-shell .halo {
+  position: absolute;
+  inset: -7px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(92,199,255,0.45) 0%, transparent 65%);
+  filter: blur(6px);
+  opacity: 0;
+  transition: opacity 0.4s ease;
+  pointer-events: none;
+}
+.planet-shell[data-state="current"] .halo {
+  opacity: 1;
+  animation: halo-pulse 3.4s ease-in-out infinite;
+}
+.planet-shell[data-state="done"] .halo {
+  opacity: 0.7;
+  background: radial-gradient(circle, rgba(109,240,168,0.35) 0%, transparent 65%);
+}
+@keyframes halo-pulse {
+  0%, 100% { transform: scale(1);     opacity: 0.65; }
+  50%      { transform: scale(1.15);  opacity: 1;    }
+}
+
+.planet {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  overflow: hidden;
+  box-shadow:
+    inset 0 0 0 1px rgba(255,255,255,0.10),
+    inset -8px -8px 18px rgba(0,0,0,0.55),
+    inset 5px 4px 12px rgba(255,255,255,0.06);
+  transition: filter 0.4s ease;
+}
+.planet-shell[data-state="locked"] .planet {
+  filter: grayscale(0.85) brightness(0.5) saturate(0.4);
+}
+
+.planet-surface {
+  position: absolute;
+  inset: 0;
+  background-repeat: repeat-x;
+  background-size: 200% 100%;
+  animation: planet-spin var(--spin, 30s) linear infinite;
+}
+.planet-shell[data-state="locked"] .planet-surface { animation-play-state: paused; }
+@keyframes planet-spin {
+  from { background-position: 0% 0; }
+  to   { background-position: -200% 0; }
+}
+
+.planet-light {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 28% 24%, rgba(255,255,255,0.38) 0%, transparent 36%),
+    radial-gradient(circle at 78% 78%, rgba(0,0,0,0.55) 0%, transparent 55%);
+  pointer-events: none;
+  mix-blend-mode: overlay;
+}
+
+/* Earth — blue oceans, green continents, white clouds */
+.planet[data-planet="earth"] { }
+.planet[data-planet="earth"] .planet-surface {
+  --spin: 26s;
+  animation-duration: 26s;
+  background-image:
+    radial-gradient(ellipse 7% 12% at 8% 28%, rgba(255,255,255,0.72) 0%, transparent 60%),
+    radial-gradient(ellipse 9% 8% at 28% 70%, rgba(255,255,255,0.62) 0%, transparent 60%),
+    radial-gradient(ellipse 6% 11% at 52% 22%, rgba(255,255,255,0.55) 0%, transparent 60%),
+    radial-gradient(ellipse 8% 12% at 78% 58%, rgba(255,255,255,0.6) 0%, transparent 60%),
+    radial-gradient(ellipse 14% 22% at 18% 40%, #3f8c52 0%, #2c6d3a 55%, transparent 78%),
+    radial-gradient(ellipse 11% 16% at 34% 65%, #4ea05c 0%, #2c6d3a 60%, transparent 82%),
+    radial-gradient(ellipse 13% 22% at 56% 30%, #3f8c52 0%, #2c6d3a 60%, transparent 82%),
+    radial-gradient(ellipse 10% 17% at 73% 62%, #57a565 0%, #2c6d3a 55%, transparent 80%),
+    radial-gradient(ellipse 8% 11% at 88% 24%, #3f8c52 0%, transparent 72%),
+    linear-gradient(180deg, #4c93d6 0%, #1f5fa8 100%);
+}
+
+/* Mars — rust red with darker bands and white poles */
+.planet[data-planet="mars"] .planet-surface {
+  animation-duration: 38s;
+  background-image:
+    radial-gradient(ellipse 8% 6% at 16% 38%, #8a2e1c 0%, transparent 75%),
+    radial-gradient(ellipse 12% 5% at 48% 58%, #6d2614 0%, transparent 75%),
+    radial-gradient(ellipse 7% 9% at 70% 32%, #8a2e1c 0%, transparent 75%),
+    radial-gradient(ellipse 10% 7% at 33% 76%, #5e2010 0%, transparent 75%),
+    radial-gradient(ellipse 13% 10% at 86% 65%, #7a2917 0%, transparent 75%),
+    radial-gradient(ellipse 60% 9% at 50% 5%, rgba(255,240,235,0.75) 0%, transparent 70%),
+    radial-gradient(ellipse 50% 8% at 50% 95%, rgba(255,240,235,0.65) 0%, transparent 70%),
+    linear-gradient(180deg, #c45a3a 0%, #a13e22 100%);
+}
+
+/* Jupiter — gas giant with horizontal bands + great red spot */
+.planet[data-planet="jupiter"] .planet-surface {
+  animation-duration: 16s;
+  background-image:
+    radial-gradient(ellipse 7% 4% at 28% 62%, #a83d24 0%, #6f2614 75%, transparent 85%),
+    linear-gradient(180deg,
+      #d4a47a 0%,  #d4a47a 9%,
+      #a76e42 9%,  #a76e42 15%,
+      #e2b88a 15%, #e2b88a 23%,
+      #8b5a31 23%, #8b5a31 29%,
+      #c89671 29%, #c89671 38%,
+      #a06734 38%, #a06734 45%,
+      #d8b083 45%, #d8b083 54%,
+      #95602f 54%, #95602f 61%,
+      #c89671 61%, #c89671 70%,
+      #7c4d27 70%, #7c4d27 77%,
+      #b88c5e 77%, #b88c5e 85%,
+      #a36e3e 85%, #a36e3e 100%);
+}
+
+/* Neptune — icy blue, with rings */
+.planet[data-planet="neptune"] .planet-surface {
+  animation-duration: 32s;
+  background-image:
+    radial-gradient(ellipse 14% 5% at 22% 38%, rgba(255,255,255,0.28) 0%, transparent 70%),
+    radial-gradient(ellipse 10% 4% at 60% 58%, rgba(255,255,255,0.22) 0%, transparent 70%),
+    radial-gradient(ellipse 8% 3% at 80% 28%, rgba(255,255,255,0.18) 0%, transparent 70%),
+    linear-gradient(180deg,
+      #1f3e72 0%, #2f5aa0 18%, #4480c4 38%,
+      #5994d6 52%, #4480c4 66%, #2f5aa0 84%, #1f3e72 100%);
+}
+.planet-ring {
+  position: absolute;
+  left: -22%;
+  top: 38%;
+  width: 144%;
+  height: 24%;
+  border-radius: 50%;
+  border: 1px solid rgba(190,210,255,0.55);
+  background: linear-gradient(180deg, transparent 38%, rgba(190,210,255,0.22) 50%, transparent 62%);
+  transform: rotate(-22deg);
+  pointer-events: none;
+  box-shadow: 0 0 10px rgba(170,200,255,0.25);
+}
+.planet-ring::before {
+  content: "";
+  position: absolute;
+  inset: 28% 12%;
+  border-radius: 50%;
+  border: 1px solid rgba(210,225,255,0.35);
+}
+.planet-ring::after {
+  /* the half of the ring that should pass BEHIND the planet — fade middle */
+  content: "";
+  position: absolute;
+  left: 38%; right: 38%; top: 0; bottom: 0;
+  background: linear-gradient(90deg, transparent 0%, rgba(5,7,15,0.0) 50%, transparent 100%);
+}
+
+/* Star (final) — glowing core with corona and flares */
+.planet-shell[data-planet="star"] {
+  width: 62px; height: 62px;
+  margin: 1px;
+}
+.planet[data-planet="star"] {
+  box-shadow:
+    inset 0 0 0 1px rgba(255,240,200,0.45),
+    inset -3px -3px 10px rgba(180,60,0,0.35);
+}
+.planet[data-planet="star"] .planet-surface {
+  animation: star-roil 8s ease-in-out infinite;
+  background:
+    radial-gradient(circle at 35% 32%, rgba(255,255,255,0.6) 0%, transparent 32%),
+    radial-gradient(circle at 50% 50%, #fff5c0 0%, #ffd86b 22%, #ffa83a 52%, #ff6b35 88%);
+}
+.planet[data-planet="star"] .planet-light {
+  background:
+    radial-gradient(circle at 50% 50%, transparent 45%, rgba(255,160,60,0.4) 75%, rgba(255,90,30,0.2) 100%);
+  mix-blend-mode: screen;
+}
+@keyframes star-roil {
+  0%, 100% { transform: scale(1)    rotate(0deg);   filter: brightness(1); }
+  50%      { transform: scale(1.04) rotate(2deg);   filter: brightness(1.1); }
+}
+.corona {
+  position: absolute;
+  inset: -12px;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle, rgba(255,200,100,0.55) 0%, rgba(255,150,80,0.22) 38%, transparent 68%);
+  filter: blur(7px);
+  animation: corona-breath 4.5s ease-in-out infinite;
+  pointer-events: none;
+}
+.corona::before {
+  content: "";
+  position: absolute;
+  inset: -10px;
+  border-radius: 50%;
+  background: conic-gradient(from 0deg,
+    rgba(255,200,100,0) 0%,
+    rgba(255,200,100,0.5) 7%,
+    rgba(255,200,100,0) 14%,
+    rgba(255,200,100,0) 30%,
+    rgba(255,200,100,0.45) 37%,
+    rgba(255,200,100,0) 44%,
+    rgba(255,200,100,0) 62%,
+    rgba(255,200,100,0.5) 69%,
+    rgba(255,200,100,0) 76%,
+    rgba(255,200,100,0) 100%);
+  filter: blur(4px);
+  animation: spin 22s linear infinite;
+}
+@keyframes corona-breath {
+  0%, 100% { transform: scale(1);     opacity: 0.85; }
+  50%      { transform: scale(1.12);  opacity: 1;    }
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.cnode-info { display: grid; gap: 4px; min-width: 0; }
+.cnode-step {
+  font-family: var(--ff-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--fg-mute);
+}
+.cnode[data-active="true"] .cnode-step { color: var(--acc-1); }
+.cnode-title {
+  font-family: var(--ff-display);
+  font-weight: 600;
+  font-size: 16px;
+  color: var(--fg);
+  letter-spacing: -0.01em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.cnode[data-state="locked"] .cnode-title { color: var(--fg-mute); }
+.cnode-meta { font-family: var(--ff-mono); font-size: 11px; color: var(--fg-faint); letter-spacing: 0.04em; }
+.cnode-meta .lock { color: var(--fg-faint); }
+
+/* stage detail */
+.stage-detail {
+  position: sticky;
+  top: 92px;
+  align-self: start;
+  display: grid;
+  gap: 20px;
+}
+.stage-detail-head {
+  padding: 26px 30px;
+  position: relative;
+  overflow: hidden;
+}
+.stage-detail-head::before {
+  content: "";
+  position: absolute;
+  right: -80px; top: -80px;
+  width: 220px; height: 220px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(92,199,255,0.18) 0%, transparent 70%);
+  pointer-events: none;
+}
+.stage-detail-head .row {
+  display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 14px;
+}
+.stage-detail-head h3 { margin: 0 0 10px; }
+.stage-detail-head .summary { color: var(--fg-soft); font-size: 15px; line-height: 1.5; max-width: 62ch; }
+.warn-banner {
+  margin-top: 14px;
+  padding: 10px 14px;
+  background: rgba(255,138,110,0.07);
+  border: 1px solid rgba(255,138,110,0.22);
+  border-radius: var(--radius-md);
+  color: #ffd0c0;
+  font-size: 13px;
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+}
+
+.stage-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+.section-card { padding: 22px 24px; }
+.section-card h4 {
+  margin: 0 0 16px;
+  font-family: var(--ff-display);
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: -0.005em;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.section-card h4 .pip {
+  width: 7px; height: 7px;
+  border-radius: 2px;
+  background: var(--acc-1);
+  box-shadow: 0 0 10px var(--acc-1);
+}
+.topics { margin: 0; padding: 0; list-style: none; display: grid; gap: 10px; }
+.topics li {
+  display: grid;
+  grid-template-columns: 6px 1fr;
+  gap: 12px;
+  color: var(--fg-soft);
+  font-size: 14px;
+  line-height: 1.45;
+  align-items: start;
+}
+.topics li::before {
+  content: "";
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: var(--fg-faint);
+  margin-top: 7px;
+}
+.topics li code {
+  font-family: var(--ff-mono);
+  font-size: 12.5px;
+  color: var(--acc-1);
+  background: rgba(92,199,255,0.07);
+  padding: 1px 6px;
+  border-radius: 4px;
+}
+.outcome {
+  margin-top: 18px;
+  padding: 14px 16px;
+  background: rgba(109,240,168,0.05);
+  border: 1px solid rgba(109,240,168,0.18);
+  border-radius: var(--radius-md);
+  font-size: 13.5px;
+  color: var(--fg-soft);
+  line-height: 1.45;
+}
+.outcome b { color: var(--acc-good); font-weight: 600; }
+
+/* courses */
+.course-list { display: grid; gap: 10px; }
+.course {
+  display: grid;
+  grid-template-columns: 36px 1fr auto;
+  gap: 14px;
+  padding: 12px 14px;
+  align-items: center;
+  background: rgba(255,255,255,0.02);
+  border: 1px solid var(--border-soft);
+  border-radius: 12px;
+  transition: all 0.16s ease;
+  color: inherit;
+}
+.course:hover { border-color: var(--border-hard); background: rgba(255,255,255,0.04); }
+.course-platform {
+  width: 36px; height: 36px;
+  border-radius: 10px;
+  display: grid; place-items: center;
+  font-family: var(--ff-mono);
+  font-weight: 700;
+  font-size: 13px;
+  color: #0a0e1f;
+}
+.course-platform[data-p="stepik"] { background: linear-gradient(135deg, #6df0a8, #2cb37a); }
+.course-platform[data-p="practicum"] { background: linear-gradient(135deg, #ffe066, #f5c067); }
+.course-platform[data-p="skillbox"] { background: linear-gradient(135deg, #ff8a6e, #e05a3e); }
+.course-platform[data-p="gb"] { background: linear-gradient(135deg, #8b6dff, #6347d4); }
+.course-platform[data-p="hexlet"] { background: linear-gradient(135deg, #5cc7ff, #2c8bd4); }
+.course-platform[data-p="rutube"] { background: linear-gradient(135deg, #b8bdd4, #6f7796); }
+.course-info { min-width: 0; }
+.course-name {
+  font-size: 14px;
+  color: var(--fg);
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.course-plat-name {
+  font-family: var(--ff-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--fg-mute);
+  margin-top: 2px;
+}
+.course-price {
+  font-family: var(--ff-mono);
+  font-size: 12px;
+  color: var(--fg-soft);
+  white-space: nowrap;
+}
+.course-price[data-free="true"] { color: var(--acc-good); }
+
+/* task */
+.task-card { padding: 22px 24px; }
+.task-prompt {
+  margin: 0 0 14px;
+  padding: 14px 16px;
+  background: rgba(139,109,255,0.06);
+  border: 1px solid rgba(139,109,255,0.18);
+  border-radius: var(--radius-md);
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--fg-soft);
+}
+.task-prompt b { color: var(--acc-2); }
+.task-textarea {
+  width: 100%;
+  min-height: 110px;
+  padding: 14px 16px;
+  background: rgba(0,0,0,0.25);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-md);
+  color: var(--fg);
+  font-family: var(--ff-mono);
+  font-size: 13px;
+  line-height: 1.55;
+  resize: vertical;
+  outline: none;
+}
+.task-textarea:focus { border-color: var(--acc-2); box-shadow: 0 0 0 4px rgba(139,109,255,0.08); }
+.task-footer { display: flex; justify-content: space-between; gap: 12px; margin-top: 14px; }
+.feedback {
+  margin-top: 14px;
+  padding: 16px 18px;
+  border-radius: var(--radius-md);
+  font-size: 14px;
+  line-height: 1.55;
+}
+.feedback-good { background: rgba(109,240,168,0.08); border: 1px solid rgba(109,240,168,0.25); color: #cdf7df; }
+.feedback-warn { background: rgba(245,192,103,0.07); border: 1px solid rgba(245,192,103,0.22); color: #f8e2bc; }
+.feedback-bad  { background: rgba(255,138,110,0.07); border: 1px solid rgba(255,138,110,0.22); color: #ffd0c0; }
+.feedback b { font-weight: 600; }
+.feedback-verdict {
+  font-family: var(--ff-mono);
+  font-size: 11px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  display: block;
+  margin-bottom: 6px;
+}
+
+/* action row at bottom of stage detail */
+.stage-actions {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+  padding-top: 4px;
+}
+.stage-actions .spacer { flex: 1; }
+
+.toast {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 12px 18px;
+  background: var(--surf-2);
+  border: 1px solid var(--border-hard);
+  border-radius: 12px;
+  font-size: 14px;
+  color: var(--fg);
+  z-index: 50;
+  backdrop-filter: blur(10px);
+  box-shadow: 0 8px 28px rgba(0,0,0,0.45);
+  animation: toast-in 0.3s ease;
+}
+@keyframes toast-in { from { opacity: 0; transform: translate(-50%, 10px); } to { opacity: 1; transform: translate(-50%, 0); } }
+
+/* density */
+[data-density="compact"] .qcard, [data-density="compact"] .stage-detail-head, [data-density="compact"] .section-card, [data-density="compact"] .task-card { padding: 18px 22px; }
+[data-density="compact"] .qcard-text { font-size: 19px; }
+[data-density="compact"] .cnode { gap: 14px; }
+
+/* responsive niceties for big-but-not-huge */
+@media (max-width: 1180px) {
+  .track-body { grid-template-columns: 280px 1fr; }
+  .stage-grid { grid-template-columns: 1fr; }
+  .input-screen { grid-template-columns: 1fr; padding: 40px 40px 60px; }
+  .quiz { grid-template-columns: 1fr; padding: 32px 32px 60px; }
+}
+
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  <script src="https://unpkg.com/react@18.3.1/umd/react.development.js"></script>
+  <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js"></script>
+  <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js"></script>
+  <script>// Прогрессоры — mock content for the hi-fi prototype.
+// Pre-baked questions/stages so the prototype works without a backend.
+
+const FIXED_OPTIONS = [
+  { key: "A", label: "Никогда не пробовал / не слышал" },
+  { key: "B", label: "Знаком в теории, но не практиковал" },
+  { key: "C", label: "Практиковал, есть реальный опыт" },
+  { key: "D", label: "Занимаюсь на продвинутом уровне" },
+];
+
+const QUESTIONS = [
+  { q: "Насколько ты знаком с синтаксисом и базовыми структурами данных Python?" },
+  { q: "Как часто ты пишешь функции, используешь list/dict comprehensions и декораторы?" },
+  { q: "В какой мере ты работал с реляционными базами данных и SQL?" },
+  { q: "Насколько ты практиковал разработку веб-API (Flask/Django/FastAPI)?" },
+];
+
+const LEVELS = {
+  "Полный новичок": { letter: "Н", short: "Новичок",   desc: "Ты в начале пути. Самое интересное впереди — построим маршрут с нуля." },
+  "Базовые знания": { letter: "И", short: "Изучающий", desc: "База есть, время её закрепить и собрать первые pet-проекты." },
+  "Средний уровень":{ letter: "П", short: "Практик",   desc: "Есть реальный опыт — пора брать настоящие проекты и углублять стек." },
+  "Продвинутый":    { letter: "Э", short: "Эксперт",   desc: "Ты в топе. Двигаемся в архитектуру, mentoring и open source." },
+};
+
+const STAGES = [
+  {
+    id: 1,
+    planet: "earth",
+    title: "Профессиональный Python",
+    weeks: 2,
+    state: "done",
+    summary: "Сначала закрепим всё, что отделяет хобби-скрипты от продакшен-кода: типизация, контекст-менеджеры, чистая структура модулей.",
+    topics: [
+      { html: "Type hints и <code>mypy</code>, протоколы и <code>typing.Protocol</code>" },
+      { html: "Генераторы, <code>yield</code>, корутины и контекст-менеджеры" },
+      { html: "<code>dataclasses</code>, <code>attrs</code>, паттерны структурирования модулей" },
+      { html: "Логирование через <code>logging</code> и работа с <code>pathlib</code>" },
+    ],
+    outcome: "Пишешь идиоматичный, типизированный Python-код, который читается как документация.",
+    courses: [
+      { plat: "stepik",    name: "Stepik",            title: "Python: основы и применение", price: 0 },
+      { plat: "hexlet",    name: "Hexlet",            title: "Python: настройка окружения и продвинутые приёмы", price: 0 },
+      { plat: "practicum", name: "Яндекс Практикум",  title: "Python-разработчик · буткемп", price: 7900 },
+    ],
+    task: "Спроектируй модуль <b>orders.py</b>, в котором есть dataclass Order, функция-валидатор и генератор по списку файлов JSON. Опиши публичный интерфейс модуля и приведи примеры использования.",
+  },
+  {
+    id: 2,
+    planet: "mars",
+    title: "Базы данных и SQLAlchemy",
+    weeks: 3,
+    state: "current",
+    summary: "Учимся хранить и доставать данные правильно. PostgreSQL + индексы + ORM, без которых не существует ни одного бэкенда.",
+    topics: [
+      { html: "SQL: <code>JOIN</code>, оконные функции, EXPLAIN ANALYZE" },
+      { html: "PostgreSQL: типы данных, индексы, транзакции, изоляция" },
+      { html: "SQLAlchemy 2.x: декларативный mapping, сессии, lazy/eager loading" },
+      { html: "Миграции через <code>Alembic</code>, версионирование схемы" },
+    ],
+    outcome: "Уверенно проектируешь схему БД и пишешь эффективные запросы — без N+1 и без боли при миграциях.",
+    courses: [
+      { plat: "stepik",    name: "Stepik",            title: "Интерактивный тренажёр по SQL", price: 0 },
+      { plat: "stepik",    name: "Stepik",            title: "PostgreSQL для разработчиков",   price: 1490 },
+      { plat: "practicum", name: "Яндекс Практикум",  title: "SQL для работы с данными",       price: 3990 },
+      { plat: "skillbox",  name: "Skillbox",          title: "Базы данных PostgreSQL",         price: 6900 },
+    ],
+    task: "Спроектируй схему БД для книжного магазина: таблицы <b>books</b>, <b>authors</b>, <b>orders</b>, <b>order_items</b>. Напиши SQL-запрос: топ-5 авторов по выручке за последний месяц с использованием JOIN и оконной функции.",
+  },
+  {
+    id: 3,
+    planet: "jupiter",
+    title: "FastAPI и продакшен-веб",
+    weeks: 4,
+    state: "locked",
+    summary: "Превращаем Python-навык в реальный сервис: async, Pydantic, dependency injection, OpenAPI и JWT-аутентификация.",
+    topics: [
+      { html: "<code>async</code> / <code>await</code>, цикл событий и асинхронные I/O" },
+      { html: "Pydantic v2: валидация, сериализация, кастомные типы" },
+      { html: "<code>Depends</code>, аутентификация, JWT, RBAC" },
+      { html: "OpenAPI, фоновые задачи, кэширование через Redis" },
+    ],
+    outcome: "Поднимаешь production-ready API: с авторизацией, документацией и понятной структурой роутов.",
+    courses: [
+      { plat: "stepik",    name: "Stepik",           title: "FastAPI: создание REST API",      price: 1990 },
+      { plat: "practicum", name: "Яндекс Практикум", title: "Бэкенд-разработчик на Python",    price: 8900 },
+      { plat: "gb",        name: "GeekBrains",       title: "FastAPI и асинхронный Python",    price: 5900 },
+    ],
+    task: "Спроектируй FastAPI-роут <b>POST /orders</b> с авторизацией через JWT и валидацией тела через Pydantic. Опиши, какие зависимости (<code>Depends</code>) ты используешь и какие коды ошибок возвращаешь.",
+  },
+  {
+    id: 4,
+    planet: "neptune",
+    rings: true,
+    title: "Тестирование и DevOps",
+    weeks: 3,
+    state: "locked",
+    summary: "Чтобы код жил долго, его надо тестировать и деплоить. pytest, фикстуры, Docker, CI — и пайплайн собирается сам.",
+    topics: [
+      { html: "<code>pytest</code>: фикстуры, параметризация, моки" },
+      { html: "Покрытие, контрактные тесты, E2E через <code>httpx</code>" },
+      { html: "<code>Docker</code>, multi-stage сборки, docker-compose" },
+      { html: "CI/CD в GitHub Actions: lint → test → build → deploy" },
+    ],
+    outcome: "Любой твой проект собирается одной командой и проходит CI прежде, чем попасть в main.",
+    courses: [
+      { plat: "stepik",    name: "Stepik",           title: "Тестирование Python-кода",        price: 990 },
+      { plat: "practicum", name: "Яндекс Практикум", title: "DevOps для бэкенда",              price: 6900 },
+      { plat: "hexlet",    name: "Hexlet",           title: "Docker и оркестрация контейнеров", price: 0 },
+    ],
+    task: "Напиши pytest-фикстуру, поднимающую тестовую PostgreSQL в Docker через <code>testcontainers</code>, и тест на эндпоинт <code>GET /orders/{id}</code>, проверяющий 200 и 404.",
+  },
+  {
+    id: 5,
+    planet: "star",
+    title: "Pet-проект для портфолио",
+    weeks: 4,
+    state: "locked",
+    final: true,
+    summary: "Собираем всё в один проект, который не стыдно показать на собеседовании: MVP, репозиторий, README, деплой.",
+    topics: [
+      { html: "Декомпозиция: backlog, MVP-скоуп, milestones" },
+      { html: "Архитектура: чистые слои, тесты, миграции" },
+      { html: "Деплой: VPS + Caddy / Yandex Cloud, мониторинг" },
+      { html: "Презентация: README, скриншоты, демо-видео" },
+    ],
+    outcome: "У тебя есть рабочий проект в портфолио и история к нему — что строил, какие выборы делал, какие компромиссы принимал.",
+    courses: [
+      { plat: "stepik",    name: "Stepik",           title: "Подготовка к собеседованиям Python", price: 1490 },
+      { plat: "practicum", name: "Яндекс Практикум", title: "Карьерный трек: бэкенд",            price: 4900 },
+    ],
+    task: "Сформулируй MVP-скоуп своего pet-проекта (3–5 фич), нарисуй ER-диаграмму БД и распиши план на 4 недели по неделям.",
+  },
+];
+
+window.PROGRESSORS_DATA = {
+  FIXED_OPTIONS,
+  QUESTIONS,
+  LEVELS,
+  STAGES,
+};
+</script>
+  <script type="text/babel">
+// tweaks-panel.jsx
+// Reusable Tweaks shell + form-control helpers.
+//
+// Owns the host protocol (listens for __activate_edit_mode / __deactivate_edit_mode,
+// posts __edit_mode_available / __edit_mode_set_keys / __edit_mode_dismissed) so
+// individual prototypes don't re-roll it. Ships a consistent set of controls so you
+// don't hand-draw <input type="range">, segmented radios, steppers, etc.
+//
+// Usage (in an HTML file that loads React + Babel):
+//
+//   const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
+//     "primaryColor": "#D97757",
+//     "palette": ["#D97757", "#29261b", "#f6f4ef"],
+//     "fontSize": 16,
+//     "density": "regular",
+//     "dark": false
+//   }/*EDITMODE-END*/;
+//
+//   function App() {
+//     const [t, setTweak] = useTweaks(TWEAK_DEFAULTS);
+//     return (
+//       <div style={{ fontSize: t.fontSize, color: t.primaryColor }}>
+//         Hello
+//         <TweaksPanel>
+//           <TweakSection label="Typography" />
+//           <TweakSlider label="Font size" value={t.fontSize} min={10} max={32} unit="px"
+//                        onChange={(v) => setTweak('fontSize', v)} />
+//           <TweakRadio  label="Density" value={t.density}
+//                        options={['compact', 'regular', 'comfy']}
+//                        onChange={(v) => setTweak('density', v)} />
+//           <TweakSection label="Theme" />
+//           <TweakColor  label="Primary" value={t.primaryColor}
+//                        options={['#D97757', '#2A6FDB', '#1F8A5B', '#7A5AE0']}
+//                        onChange={(v) => setTweak('primaryColor', v)} />
+//           <TweakColor  label="Palette" value={t.palette}
+//                        options={[['#D97757', '#29261b', '#f6f4ef'],
+//                                  ['#475569', '#0f172a', '#f1f5f9']]}
+//                        onChange={(v) => setTweak('palette', v)} />
+//           <TweakToggle label="Dark mode" value={t.dark}
+//                        onChange={(v) => setTweak('dark', v)} />
+//         </TweaksPanel>
+//       </div>
+//     );
+//   }
+//
+// ─────────────────────────────────────────────────────────────────────────────
+
+const __TWEAKS_STYLE = `
+  .twk-panel{position:fixed;right:16px;bottom:16px;z-index:2147483646;width:280px;
+    max-height:calc(100vh - 32px);display:flex;flex-direction:column;
+    transform:scale(var(--dc-inv-zoom,1));transform-origin:bottom right;
+    background:rgba(250,249,247,.78);color:#29261b;
+    -webkit-backdrop-filter:blur(24px) saturate(160%);backdrop-filter:blur(24px) saturate(160%);
+    border:.5px solid rgba(255,255,255,.6);border-radius:14px;
+    box-shadow:0 1px 0 rgba(255,255,255,.5) inset,0 12px 40px rgba(0,0,0,.18);
+    font:11.5px/1.4 ui-sans-serif,system-ui,-apple-system,sans-serif;overflow:hidden}
+  .twk-hd{display:flex;align-items:center;justify-content:space-between;
+    padding:10px 8px 10px 14px;cursor:move;user-select:none}
+  .twk-hd b{font-size:12px;font-weight:600;letter-spacing:.01em}
+  .twk-x{appearance:none;border:0;background:transparent;color:rgba(41,38,27,.55);
+    width:22px;height:22px;border-radius:6px;cursor:default;font-size:13px;line-height:1}
+  .twk-x:hover{background:rgba(0,0,0,.06);color:#29261b}
+  .twk-body{padding:2px 14px 14px;display:flex;flex-direction:column;gap:10px;
+    overflow-y:auto;overflow-x:hidden;min-height:0;
+    scrollbar-width:thin;scrollbar-color:rgba(0,0,0,.15) transparent}
+  .twk-body::-webkit-scrollbar{width:8px}
+  .twk-body::-webkit-scrollbar-track{background:transparent;margin:2px}
+  .twk-body::-webkit-scrollbar-thumb{background:rgba(0,0,0,.15);border-radius:4px;
+    border:2px solid transparent;background-clip:content-box}
+  .twk-body::-webkit-scrollbar-thumb:hover{background:rgba(0,0,0,.25);
+    border:2px solid transparent;background-clip:content-box}
+  .twk-row{display:flex;flex-direction:column;gap:5px}
+  .twk-row-h{flex-direction:row;align-items:center;justify-content:space-between;gap:10px}
+  .twk-lbl{display:flex;justify-content:space-between;align-items:baseline;
+    color:rgba(41,38,27,.72)}
+  .twk-lbl>span:first-child{font-weight:500}
+  .twk-val{color:rgba(41,38,27,.5);font-variant-numeric:tabular-nums}
+
+  .twk-sect{font-size:10px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;
+    color:rgba(41,38,27,.45);padding:10px 0 0}
+  .twk-sect:first-child{padding-top:0}
+
+  .twk-field{appearance:none;box-sizing:border-box;width:100%;min-width:0;height:26px;padding:0 8px;
+    border:.5px solid rgba(0,0,0,.1);border-radius:7px;
+    background:rgba(255,255,255,.6);color:inherit;font:inherit;outline:none}
+  .twk-field:focus{border-color:rgba(0,0,0,.25);background:rgba(255,255,255,.85)}
+  select.twk-field{padding-right:22px;
+    background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'><path fill='rgba(0,0,0,.5)' d='M0 0h10L5 6z'/></svg>");
+    background-repeat:no-repeat;background-position:right 8px center}
+
+  .twk-slider{appearance:none;-webkit-appearance:none;width:100%;height:4px;margin:6px 0;
+    border-radius:999px;background:rgba(0,0,0,.12);outline:none}
+  .twk-slider::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;
+    width:14px;height:14px;border-radius:50%;background:#fff;
+    border:.5px solid rgba(0,0,0,.12);box-shadow:0 1px 3px rgba(0,0,0,.2);cursor:default}
+  .twk-slider::-moz-range-thumb{width:14px;height:14px;border-radius:50%;
+    background:#fff;border:.5px solid rgba(0,0,0,.12);box-shadow:0 1px 3px rgba(0,0,0,.2);cursor:default}
+
+  .twk-seg{position:relative;display:flex;padding:2px;border-radius:8px;
+    background:rgba(0,0,0,.06);user-select:none}
+  .twk-seg-thumb{position:absolute;top:2px;bottom:2px;border-radius:6px;
+    background:rgba(255,255,255,.9);box-shadow:0 1px 2px rgba(0,0,0,.12);
+    transition:left .15s cubic-bezier(.3,.7,.4,1),width .15s}
+  .twk-seg.dragging .twk-seg-thumb{transition:none}
+  .twk-seg button{appearance:none;position:relative;z-index:1;flex:1;border:0;
+    background:transparent;color:inherit;font:inherit;font-weight:500;min-height:22px;
+    border-radius:6px;cursor:default;padding:4px 6px;line-height:1.2;
+    overflow-wrap:anywhere}
+
+  .twk-toggle{position:relative;width:32px;height:18px;border:0;border-radius:999px;
+    background:rgba(0,0,0,.15);transition:background .15s;cursor:default;padding:0}
+  .twk-toggle[data-on="1"]{background:#34c759}
+  .twk-toggle i{position:absolute;top:2px;left:2px;width:14px;height:14px;border-radius:50%;
+    background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.25);transition:transform .15s}
+  .twk-toggle[data-on="1"] i{transform:translateX(14px)}
+
+  .twk-num{display:flex;align-items:center;box-sizing:border-box;min-width:0;height:26px;padding:0 0 0 8px;
+    border:.5px solid rgba(0,0,0,.1);border-radius:7px;background:rgba(255,255,255,.6)}
+  .twk-num-lbl{font-weight:500;color:rgba(41,38,27,.6);cursor:ew-resize;
+    user-select:none;padding-right:8px}
+  .twk-num input{flex:1;min-width:0;height:100%;border:0;background:transparent;
+    font:inherit;font-variant-numeric:tabular-nums;text-align:right;padding:0 8px 0 0;
+    outline:none;color:inherit;-moz-appearance:textfield}
+  .twk-num input::-webkit-inner-spin-button,.twk-num input::-webkit-outer-spin-button{
+    -webkit-appearance:none;margin:0}
+  .twk-num-unit{padding-right:8px;color:rgba(41,38,27,.45)}
+
+  .twk-btn{appearance:none;height:26px;padding:0 12px;border:0;border-radius:7px;
+    background:rgba(0,0,0,.78);color:#fff;font:inherit;font-weight:500;cursor:default}
+  .twk-btn:hover{background:rgba(0,0,0,.88)}
+  .twk-btn.secondary{background:rgba(0,0,0,.06);color:inherit}
+  .twk-btn.secondary:hover{background:rgba(0,0,0,.1)}
+
+  .twk-swatch{appearance:none;-webkit-appearance:none;width:56px;height:22px;
+    border:.5px solid rgba(0,0,0,.1);border-radius:6px;padding:0;cursor:default;
+    background:transparent;flex-shrink:0}
+  .twk-swatch::-webkit-color-swatch-wrapper{padding:0}
+  .twk-swatch::-webkit-color-swatch{border:0;border-radius:5.5px}
+  .twk-swatch::-moz-color-swatch{border:0;border-radius:5.5px}
+
+  .twk-chips{display:flex;gap:6px}
+  .twk-chip{position:relative;appearance:none;flex:1;min-width:0;height:46px;
+    padding:0;border:0;border-radius:6px;overflow:hidden;cursor:default;
+    box-shadow:0 0 0 .5px rgba(0,0,0,.12),0 1px 2px rgba(0,0,0,.06);
+    transition:transform .12s cubic-bezier(.3,.7,.4,1),box-shadow .12s}
+  .twk-chip:hover{transform:translateY(-1px);
+    box-shadow:0 0 0 .5px rgba(0,0,0,.18),0 4px 10px rgba(0,0,0,.12)}
+  .twk-chip[data-on="1"]{box-shadow:0 0 0 1.5px rgba(0,0,0,.85),
+    0 2px 6px rgba(0,0,0,.15)}
+  .twk-chip>span{position:absolute;top:0;bottom:0;right:0;width:34%;
+    display:flex;flex-direction:column;box-shadow:-1px 0 0 rgba(0,0,0,.1)}
+  .twk-chip>span>i{flex:1;box-shadow:0 -1px 0 rgba(0,0,0,.1)}
+  .twk-chip>span>i:first-child{box-shadow:none}
+  .twk-chip svg{position:absolute;top:6px;left:6px;width:13px;height:13px;
+    filter:drop-shadow(0 1px 1px rgba(0,0,0,.3))}
+`;
+
+// ── useTweaks ───────────────────────────────────────────────────────────────
+// Single source of truth for tweak values. setTweak persists via the host
+// (__edit_mode_set_keys → host rewrites the EDITMODE block on disk).
+function useTweaks(defaults) {
+  const [values, setValues] = React.useState(defaults);
+  // Accepts either setTweak('key', value) or setTweak({ key: value, ... }) so a
+  // useState-style call doesn't write a "[object Object]" key into the persisted
+  // JSON block.
+  const setTweak = React.useCallback((keyOrEdits, val) => {
+    const edits = typeof keyOrEdits === 'object' && keyOrEdits !== null
+      ? keyOrEdits : { [keyOrEdits]: val };
+    setValues((prev) => ({ ...prev, ...edits }));
+    window.parent.postMessage({ type: '__edit_mode_set_keys', edits }, '*');
+    // Same-window signal so in-page listeners (deck-stage rail thumbnails)
+    // can react — the parent message only reaches the host, not peers.
+    window.dispatchEvent(new CustomEvent('tweakchange', { detail: edits }));
+  }, []);
+  return [values, setTweak];
+}
+
+// ── TweaksPanel ─────────────────────────────────────────────────────────────
+// Floating shell. Registers the protocol listener BEFORE announcing
+// availability — if the announce ran first, the host's activate could land
+// before our handler exists and the toolbar toggle would silently no-op.
+// The close button posts __edit_mode_dismissed so the host's toolbar toggle
+// flips off in lockstep; the host echoes __deactivate_edit_mode back which
+// is what actually hides the panel.
+function TweaksPanel({ title = 'Tweaks', noDeckControls = false, children }) {
+  const [open, setOpen] = React.useState(false);
+  const dragRef = React.useRef(null);
+  // Auto-inject a rail toggle when a <deck-stage> is on the page. The
+  // toggle drives the deck's per-viewer _railVisible via window message;
+  // state is mirrored from the same localStorage key the deck reads so
+  // the control reflects reality across reloads. The mechanism is the
+  // message — authors who want custom placement can post it directly
+  // and pass noDeckControls to suppress this one.
+  const hasDeckStage = React.useMemo(
+    () => typeof document !== 'undefined' && !!document.querySelector('deck-stage'),
+    [],
+  );
+  // deck-stage enables its rail in connectedCallback, but this panel can
+  // mount before that element has upgraded. The initial read catches the
+  // common case; the listener covers mounting first. (Older deck-stage.js
+  // copies still wait for the host's __omelette_rail_enabled postMessage —
+  // same listener handles those.)
+  const [railEnabled, setRailEnabled] = React.useState(
+    () => hasDeckStage && !!document.querySelector('deck-stage')?._railEnabled,
+  );
+  React.useEffect(() => {
+    if (!hasDeckStage || railEnabled) return undefined;
+    const onMsg = (e) => {
+      if (e.data && e.data.type === '__omelette_rail_enabled') setRailEnabled(true);
+    };
+    window.addEventListener('message', onMsg);
+    return () => window.removeEventListener('message', onMsg);
+  }, [hasDeckStage, railEnabled]);
+  const [railVisible, setRailVisible] = React.useState(() => {
+    try { return localStorage.getItem('deck-stage.railVisible') !== '0'; } catch (e) { return true; }
+  });
+  const toggleRail = (on) => {
+    setRailVisible(on);
+    window.postMessage({ type: '__deck_rail_visible', on }, '*');
+  };
+  const offsetRef = React.useRef({ x: 16, y: 16 });
+  const PAD = 16;
+
+  const clampToViewport = React.useCallback(() => {
+    const panel = dragRef.current;
+    if (!panel) return;
+    const w = panel.offsetWidth, h = panel.offsetHeight;
+    const maxRight = Math.max(PAD, window.innerWidth - w - PAD);
+    const maxBottom = Math.max(PAD, window.innerHeight - h - PAD);
+    offsetRef.current = {
+      x: Math.min(maxRight, Math.max(PAD, offsetRef.current.x)),
+      y: Math.min(maxBottom, Math.max(PAD, offsetRef.current.y)),
+    };
+    panel.style.right = offsetRef.current.x + 'px';
+    panel.style.bottom = offsetRef.current.y + 'px';
+  }, []);
+
+  React.useEffect(() => {
+    if (!open) return;
+    clampToViewport();
+    if (typeof ResizeObserver === 'undefined') {
+      window.addEventListener('resize', clampToViewport);
+      return () => window.removeEventListener('resize', clampToViewport);
+    }
+    const ro = new ResizeObserver(clampToViewport);
+    ro.observe(document.documentElement);
+    return () => ro.disconnect();
+  }, [open, clampToViewport]);
+
+  React.useEffect(() => {
+    const onMsg = (e) => {
+      const t = e?.data?.type;
+      if (t === '__activate_edit_mode') setOpen(true);
+      else if (t === '__deactivate_edit_mode') setOpen(false);
+    };
+    window.addEventListener('message', onMsg);
+    window.parent.postMessage({ type: '__edit_mode_available' }, '*');
+    return () => window.removeEventListener('message', onMsg);
+  }, []);
+
+  const dismiss = () => {
+    setOpen(false);
+    window.parent.postMessage({ type: '__edit_mode_dismissed' }, '*');
+  };
+
+  const onDragStart = (e) => {
+    const panel = dragRef.current;
+    if (!panel) return;
+    const r = panel.getBoundingClientRect();
+    const sx = e.clientX, sy = e.clientY;
+    const startRight = window.innerWidth - r.right;
+    const startBottom = window.innerHeight - r.bottom;
+    const move = (ev) => {
+      offsetRef.current = {
+        x: startRight - (ev.clientX - sx),
+        y: startBottom - (ev.clientY - sy),
+      };
+      clampToViewport();
+    };
+    const up = () => {
+      window.removeEventListener('mousemove', move);
+      window.removeEventListener('mouseup', up);
+    };
+    window.addEventListener('mousemove', move);
+    window.addEventListener('mouseup', up);
+  };
+
+  if (!open) return null;
+  return (
+    <>
+      <style>{__TWEAKS_STYLE}</style>
+      <div ref={dragRef} className="twk-panel" data-noncommentable=""
+           style={{ right: offsetRef.current.x, bottom: offsetRef.current.y }}>
+        <div className="twk-hd" onMouseDown={onDragStart}>
+          <b>{title}</b>
+          <button className="twk-x" aria-label="Close tweaks"
+                  onMouseDown={(e) => e.stopPropagation()}
+                  onClick={dismiss}>✕</button>
+        </div>
+        <div className="twk-body">
+          {children}
+          {hasDeckStage && railEnabled && !noDeckControls && (
+            <TweakSection label="Deck">
+              <TweakToggle label="Thumbnail rail" value={railVisible} onChange={toggleRail} />
+            </TweakSection>
+          )}
+        </div>
+      </div>
+    </>
+  );
+}
+
+// ── Layout helpers ──────────────────────────────────────────────────────────
+
+function TweakSection({ label, children }) {
+  return (
+    <>
+      <div className="twk-sect">{label}</div>
+      {children}
+    </>
+  );
+}
+
+function TweakRow({ label, value, children, inline = false }) {
+  return (
+    <div className={inline ? 'twk-row twk-row-h' : 'twk-row'}>
+      <div className="twk-lbl">
+        <span>{label}</span>
+        {value != null && <span className="twk-val">{value}</span>}
+      </div>
+      {children}
+    </div>
+  );
+}
+
+// ── Controls ────────────────────────────────────────────────────────────────
+
+function TweakSlider({ label, value, min = 0, max = 100, step = 1, unit = '', onChange }) {
+  return (
+    <TweakRow label={label} value={`${value}${unit}`}>
+      <input type="range" className="twk-slider" min={min} max={max} step={step}
+             value={value} onChange={(e) => onChange(Number(e.target.value))} />
+    </TweakRow>
+  );
+}
+
+function TweakToggle({ label, value, onChange }) {
+  return (
+    <div className="twk-row twk-row-h">
+      <div className="twk-lbl"><span>{label}</span></div>
+      <button type="button" className="twk-toggle" data-on={value ? '1' : '0'}
+              role="switch" aria-checked={!!value}
+              onClick={() => onChange(!value)}><i /></button>
+    </div>
+  );
+}
+
+function TweakRadio({ label, value, options, onChange }) {
+  const trackRef = React.useRef(null);
+  const [dragging, setDragging] = React.useState(false);
+  // The active value is read by pointer-move handlers attached for the lifetime
+  // of a drag — ref it so a stale closure doesn't fire onChange for every move.
+  const valueRef = React.useRef(value);
+  valueRef.current = value;
+
+  // Segments wrap mid-word once per-segment width runs out. The track is
+  // ~248px (280 panel − 28 body pad − 4 seg pad), each button loses 12px
+  // to its own padding, and 11.5px system-ui averages ~6.3px/char — so 2
+  // options fit ~16 chars each, 3 fit ~10. Past that (or >3 options), fall
+  // back to a dropdown rather than wrap.
+  const labelLen = (o) => String(typeof o === 'object' ? o.label : o).length;
+  const maxLen = options.reduce((m, o) => Math.max(m, labelLen(o)), 0);
+  const fitsAsSegments = maxLen <= ({ 2: 16, 3: 10 }[options.length] ?? 0);
+  if (!fitsAsSegments) {
+    // <select> emits strings — map back to the original option value so the
+    // fallback stays type-preserving (numbers, booleans) like the segment path.
+    const resolve = (s) => {
+      const m = options.find((o) => String(typeof o === 'object' ? o.value : o) === s);
+      return m === undefined ? s : typeof m === 'object' ? m.value : m;
+    };
+    return <TweakSelect label={label} value={value} options={options}
+                        onChange={(s) => onChange(resolve(s))} />;
+  }
+  const opts = options.map((o) => (typeof o === 'object' ? o : { value: o, label: o }));
+  const idx = Math.max(0, opts.findIndex((o) => o.value === value));
+  const n = opts.length;
+
+  const segAt = (clientX) => {
+    const r = trackRef.current.getBoundingClientRect();
+    const inner = r.width - 4;
+    const i = Math.floor(((clientX - r.left - 2) / inner) * n);
+    return opts[Math.max(0, Math.min(n - 1, i))].value;
+  };
+
+  const onPointerDown = (e) => {
+    setDragging(true);
+    const v0 = segAt(e.clientX);
+    if (v0 !== valueRef.current) onChange(v0);
+    const move = (ev) => {
+      if (!trackRef.current) return;
+      const v = segAt(ev.clientX);
+      if (v !== valueRef.current) onChange(v);
+    };
+    const up = () => {
+      setDragging(false);
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', up);
+    };
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', up);
+  };
+
+  return (
+    <TweakRow label={label}>
+      <div ref={trackRef} role="radiogroup" onPointerDown={onPointerDown}
+           className={dragging ? 'twk-seg dragging' : 'twk-seg'}>
+        <div className="twk-seg-thumb"
+             style={{ left: `calc(2px + ${idx} * (100% - 4px) / ${n})`,
+                      width: `calc((100% - 4px) / ${n})` }} />
+        {opts.map((o) => (
+          <button key={o.value} type="button" role="radio" aria-checked={o.value === value}>
+            {o.label}
+          </button>
+        ))}
+      </div>
+    </TweakRow>
+  );
+}
+
+function TweakSelect({ label, value, options, onChange }) {
+  return (
+    <TweakRow label={label}>
+      <select className="twk-field" value={value} onChange={(e) => onChange(e.target.value)}>
+        {options.map((o) => {
+          const v = typeof o === 'object' ? o.value : o;
+          const l = typeof o === 'object' ? o.label : o;
+          return <option key={v} value={v}>{l}</option>;
+        })}
+      </select>
+    </TweakRow>
+  );
+}
+
+function TweakText({ label, value, placeholder, onChange }) {
+  return (
+    <TweakRow label={label}>
+      <input className="twk-field" type="text" value={value} placeholder={placeholder}
+             onChange={(e) => onChange(e.target.value)} />
+    </TweakRow>
+  );
+}
+
+function TweakNumber({ label, value, min, max, step = 1, unit = '', onChange }) {
+  const clamp = (n) => {
+    if (min != null && n < min) return min;
+    if (max != null && n > max) return max;
+    return n;
+  };
+  const startRef = React.useRef({ x: 0, val: 0 });
+  const onScrubStart = (e) => {
+    e.preventDefault();
+    startRef.current = { x: e.clientX, val: value };
+    const decimals = (String(step).split('.')[1] || '').length;
+    const move = (ev) => {
+      const dx = ev.clientX - startRef.current.x;
+      const raw = startRef.current.val + dx * step;
+      const snapped = Math.round(raw / step) * step;
+      onChange(clamp(Number(snapped.toFixed(decimals))));
+    };
+    const up = () => {
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', up);
+    };
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', up);
+  };
+  return (
+    <div className="twk-num">
+      <span className="twk-num-lbl" onPointerDown={onScrubStart}>{label}</span>
+      <input type="number" value={value} min={min} max={max} step={step}
+             onChange={(e) => onChange(clamp(Number(e.target.value)))} />
+      {unit && <span className="twk-num-unit">{unit}</span>}
+    </div>
+  );
+}
+
+// Relative-luminance contrast pick — checkmarks drawn over a swatch need to
+// read on both #111 and #fafafa without per-option configuration. Hex input
+// only (#rgb / #rrggbb); named or rgb()/hsl() colors fall through to "light".
+function __twkIsLight(hex) {
+  const h = String(hex).replace('#', '');
+  const x = h.length === 3 ? h.replace(/./g, (c) => c + c) : h.padEnd(6, '0');
+  const n = parseInt(x.slice(0, 6), 16);
+  if (Number.isNaN(n)) return true;
+  const r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255;
+  return r * 299 + g * 587 + b * 114 > 148000;
+}
+
+const __TwkCheck = ({ light }) => (
+  <svg viewBox="0 0 14 14" aria-hidden="true">
+    <path d="M3 7.2 5.8 10 11 4.2" fill="none" strokeWidth="2.2"
+          strokeLinecap="round" strokeLinejoin="round"
+          stroke={light ? 'rgba(0,0,0,.78)' : '#fff'} />
+  </svg>
+);
+
+// TweakColor — curated color/palette picker. Each option is either a single
+// hex string or an array of 1-5 hex strings; the card adapts — a lone color
+// renders solid, a palette renders colors[0] as the hero (left ~2/3) with the
+// rest stacked in a sharp column on the right. onChange emits the
+// option in the shape it was passed (string stays string, array stays array).
+// Without options it falls back to the native color input for back-compat.
+function TweakColor({ label, value, options, onChange }) {
+  if (!options || !options.length) {
+    return (
+      <div className="twk-row twk-row-h">
+        <div className="twk-lbl"><span>{label}</span></div>
+        <input type="color" className="twk-swatch" value={value}
+               onChange={(e) => onChange(e.target.value)} />
+      </div>
+    );
+  }
+  // Native <input type=color> emits lowercase hex per the HTML spec, so
+  // compare case-insensitively. String() guards JSON.stringify(undefined),
+  // which returns the primitive undefined (no .toLowerCase).
+  const key = (o) => String(JSON.stringify(o)).toLowerCase();
+  const cur = key(value);
+  return (
+    <TweakRow label={label}>
+      <div className="twk-chips" role="radiogroup">
+        {options.map((o, i) => {
+          const colors = Array.isArray(o) ? o : [o];
+          const [hero, ...rest] = colors;
+          const sup = rest.slice(0, 4);
+          const on = key(o) === cur;
+          return (
+            <button key={i} type="button" className="twk-chip" role="radio"
+                    aria-checked={on} data-on={on ? '1' : '0'}
+                    aria-label={colors.join(', ')} title={colors.join(' · ')}
+                    style={{ background: hero }}
+                    onClick={() => onChange(o)}>
+              {sup.length > 0 && (
+                <span>
+                  {sup.map((c, j) => <i key={j} style={{ background: c }} />)}
+                </span>
+              )}
+              {on && <__TwkCheck light={__twkIsLight(hero)} />}
+            </button>
+          );
+        })}
+      </div>
+    </TweakRow>
+  );
+}
+
+function TweakButton({ label, onClick, secondary = false }) {
+  return (
+    <button type="button" className={secondary ? 'twk-btn secondary' : 'twk-btn'}
+            onClick={onClick}>{label}</button>
+  );
+}
+
+Object.assign(window, {
+  useTweaks, TweaksPanel, TweakSection, TweakRow,
+  TweakSlider, TweakToggle, TweakRadio, TweakSelect,
+  TweakText, TweakNumber, TweakColor, TweakButton,
+});
+</script>
+  <script type="text/babel">/* global React */
+const { useEffect, useState, useRef, useMemo } = React;
+
+// ─── Topbar ─────────────────────────────────────────────────────────────
+function Topbar({ step, level, onRestart }) {
+  return (
+    <div className="topbar">
+      <div className="brand">
+        <div className="brand-mark" />
+        <div className="brand-name">Прогрессоры</div>
+        <div className="brand-tag">ai · навигатор по обучению</div>
+      </div>
+      <div className="topbar-right">
+        {step === "input"   && <span><span className="dot" /> сессия / 01 ввод цели</span>}
+        {step === "quiz"    && <span><span className="dot" /> сессия / 02 диагностика</span>}
+        {step === "reveal"  && <span><span className="dot" /> сессия / 03 уровень определён</span>}
+        {step === "track"   && (
+          <>
+            <span><span className="dot" /> сессия / 04 трек</span>
+            {level && <span style={{ color: "var(--acc-3)" }}>уровень · {level}</span>}
+            <button className="btn btn-ghost btn-sm" onClick={onRestart}>Начать заново</button>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─── Background cosmos ──────────────────────────────────────────────────
+function Cosmos() {
+  return <div className="cosmos" aria-hidden="true" />;
+}
+
+// ─── Slider with custom track fill (for hours / months) ────────────────
+function CosmicSlider({ value, min, max, step = 1, onChange, suffix = "", ticks }) {
+  const p = ((value - min) / (max - min)) * 100;
+  return (
+    <div className="slider-wrap">
+      <input
+        type="range"
+        className="slider"
+        min={min} max={max} step={step}
+        value={value}
+        onChange={(e) => onChange(Number(e.target.value))}
+        style={{ "--p": `${p}%` }}
+      />
+      <div className="slider-ticks">
+        {(ticks || [min, Math.round((min + max) / 2), max]).map((t, i) => (
+          <span key={i}>{t}{suffix}</span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ─── Segmented control (budget) ─────────────────────────────────────────
+function Segmented({ options, value, onChange }) {
+  return (
+    <div className="segmented">
+      {options.map((opt) => (
+        <button
+          key={opt.value}
+          type="button"
+          data-active={opt.value === value}
+          onClick={() => onChange(opt.value)}
+        >
+          {opt.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+Object.assign(window, { Topbar, Cosmos, CosmicSlider, Segmented });
+</script>
+  <script type="text/babel">/* global React, CosmicSlider, Segmented */
+const { useState: useStateS, useEffect: useEffectS, useMemo: useMemoS } = React;
+
+const BUDGET_OPTS = [
+  { value: 0,     label: "Бесплатно" },
+  { value: 2500,  label: "2 500 ₽" },
+  { value: 5000,  label: "5 000 ₽" },
+  { value: 10000, label: "10 000 ₽" },
+];
+
+const BUDGET_NOTES = {
+  0:     "Бесплатно: Rutube, бесплатные курсы на Stepik, открытая документация и GitHub. Прогресс возможен, но медленнее.",
+  2500:  "До 2 500 ₽/мес: 1–2 курса на Stepik (500–1 500 ₽), электронные книги, недорогие подписки.",
+  5000:  "До 5 000 ₽/мес: большинство курсов на Stepik, Hexlet, Я.Практикум базовый, 1–2 сессии с ментором.",
+  10000: "До 10 000 ₽/мес: полноценные программы Skillbox, GeekBrains, Я.Практикум, регулярный менторинг.",
+};
+
+// ─── Input screen ──────────────────────────────────────────────────────
+function InputScreen({ state, setState, onSubmit, error }) {
+  const { goal, hours, months, budget } = state;
+  const total = hours * months * 4;
+  const tooFew = total < 8;
+
+  return (
+    <div className="input-screen">
+      <div className="intro-side">
+        <div className="intro-eyebrow-row">
+          <span className="eyebrow">Шаг 01 / 04</span>
+          <span className="glyph-divider" />
+          <span className="eyebrow" style={{ color: "var(--acc-1)" }}>координаты маршрута</span>
+        </div>
+        <h1 className="display-1">
+          Куда летим в этот раз,&nbsp;
+          <span className="aurora-text">прогрессор</span>?
+        </h1>
+        <p className="lede" style={{ marginTop: 20 }}>
+          Скажи, чему хочешь научиться. Мы сверим траекторию с твоим уровнем,
+          временем и бюджетом — и построим путь по созвездию навыков.
+        </p>
+        <ul className="intro-bullets">
+          <li>
+            <span className="num">01</span>
+            <span><b>Диагностика за 4 вопроса.</b> ИИ определит твой уровень — от Новичка до Эксперта.</span>
+          </li>
+          <li>
+            <span className="num">02</span>
+            <span><b>Личный трек из этапов-планет.</b> Каждая планета — навык, на котором нужно остановиться.</span>
+          </li>
+          <li>
+            <span className="num">03</span>
+            <span><b>Реальные курсы и задания.</b> Stepik, Я.Практикум, Skillbox — только то, что доступно в РФ без VPN.</span>
+          </li>
+        </ul>
+      </div>
+
+      <form
+        className="panel panel-pad form-card"
+        onSubmit={(e) => { e.preventDefault(); if (!tooFew && goal.trim()) onSubmit(); }}
+      >
+        <div className="field">
+          <label className="field-label">
+            <span>Чему хочешь научиться?</span>
+            <span className="hint">{goal.length}/100</span>
+          </label>
+          <input
+            className="input"
+            placeholder="Например: Python-разработка, ML, веб-дизайн"
+            value={goal}
+            maxLength={100}
+            onChange={(e) => setState({ ...state, goal: e.target.value })}
+          />
+        </div>
+
+        <div className="field">
+          <label className="field-label">
+            <span>Часов в неделю</span>
+            <span className="hint">{hours} ч/нед</span>
+          </label>
+          <CosmicSlider
+            value={hours} min={1} max={40} suffix=" ч"
+            ticks={[1, 10, 20, 30, 40]}
+            onChange={(v) => setState({ ...state, hours: v })}
+          />
+        </div>
+
+        <div className="field">
+          <label className="field-label">
+            <span>За сколько месяцев</span>
+            <span className="hint">{months} мес</span>
+          </label>
+          <CosmicSlider
+            value={months} min={1} max={12} suffix=""
+            ticks={[1, 3, 6, 9, 12]}
+            onChange={(v) => setState({ ...state, months: v })}
+          />
+        </div>
+
+        <div className="field">
+          <label className="field-label">
+            <span>Бюджет в месяц</span>
+            <span className="hint">≈ {total} ч суммарно</span>
+          </label>
+          <Segmented
+            options={BUDGET_OPTS}
+            value={budget}
+            onChange={(v) => setState({ ...state, budget: v })}
+          />
+          <div className="budget-note">{BUDGET_NOTES[budget]}</div>
+        </div>
+
+        {tooFew && (
+          <div className="alert alert-warn">
+            <span>⛔ Слишком мало времени: {total} ч за весь срок. Для реального результата нужно минимум 8 часов суммарно.</span>
+          </div>
+        )}
+        {error && (
+          <div className="alert alert-warn">
+            <span>⚠️ {error}</span>
+          </div>
+        )}
+
+        <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+          <button type="submit" className="btn btn-primary" disabled={tooFew || !goal.trim()}>
+            Запустить диагностику
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+              <path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </button>
+          <span style={{ fontFamily: "var(--ff-mono)", fontSize: 11, color: "var(--fg-mute)", letterSpacing: "0.08em" }}>
+            ≈ 2 МИН · 4 ВОПРОСА
+          </span>
+        </div>
+      </form>
+    </div>
+  );
+}
+
+// ─── Quiz screen ───────────────────────────────────────────────────────
+function QuizScreen({ state, setState, onSubmit, onBack }) {
+  const Q = (state.questions && state.questions.length > 0)
+    ? state.questions
+    : window.PROGRESSORS_DATA.QUESTIONS;
+  const OPTS = window.PROGRESSORS_DATA.FIXED_OPTIONS;
+  const answers = state.answers;
+  const answered = answers.filter((a) => a !== null).length;
+  const allDone = answered === Q.length;
+
+  const choose = (qi, oi) => {
+    const next = [...answers];
+    next[qi] = oi;
+    setState({ ...state, answers: next });
+  };
+
+  return (
+    <div className="quiz">
+      <aside className="quiz-aside">
+        <div className="panel panel-pad" style={{ padding: "24px 26px" }}>
+          <div className="eyebrow" style={{ marginBottom: 10 }}>Шаг 02 / 04 · диагностика</div>
+          <div className="display-3" style={{ fontSize: 22, marginBottom: 20 }}>{state.goal}</div>
+          <div className="quiz-progress">
+            <div className="quiz-progress-bar">
+              {Q.map((_, i) => (
+                <i key={i}
+                   data-done={answers[i] !== null && i < answered}
+                   data-current={i === answered && !allDone} />
+              ))}
+            </div>
+            <div className="quiz-meta">
+              <div className="row"><span>Отвечено</span><span>{answered} / {Q.length}</span></div>
+              <div className="row"><span>Часов/нед</span><span>{state.hours} ч</span></div>
+              <div className="row"><span>Срок</span><span>{state.months} мес</span></div>
+              <div className="row"><span>Бюджет</span><span>{state.budget === 0 ? "Бесплатно" : `${state.budget} ₽`}</span></div>
+            </div>
+          </div>
+          <div style={{ marginTop: 24, fontSize: 13, color: "var(--fg-mute)", lineHeight: 1.55 }}>
+            Шкала ответов фиксированная — ИИ-вопросы подобраны под неё. Уровень рассчитывается по формуле, без лишнего вызова модели.
+          </div>
+          <button className="btn btn-ghost btn-sm" style={{ marginTop: 18 }} onClick={onBack}>← Назад</button>
+        </div>
+      </aside>
+
+      <div className="quiz-questions">
+        {Q.map((q, i) => (
+          <div key={i} className="panel qcard">
+            <div className="qcard-num">Вопрос {String(i + 1).padStart(2, "0")} / {Q.length}</div>
+            <h3 className="qcard-text">{q.question || q.q}</h3>
+            <div className="qoptions">
+              {OPTS.map((opt, oi) => (
+                <button
+                  key={opt.key}
+                  type="button"
+                  className="qopt"
+                  data-selected={answers[i] === oi}
+                  onClick={() => choose(i, oi)}
+                >
+                  <span className="qopt-key">{opt.key}</span>
+                  <span>{opt.label}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        ))}
+
+        <div className="quiz-footer">
+          <span className="progress-text">{answered} / {Q.length} ответов</span>
+          <button className="btn btn-primary" disabled={!allDone} onClick={onSubmit}>
+            Определить уровень
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+              <path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Reveal screen ─────────────────────────────────────────────────────
+function RevealScreen({ state, onContinue }) {
+  const { LEVELS } = window.PROGRESSORS_DATA;
+  const lvl = LEVELS[state.level] || LEVELS["Средний уровень"];
+  const total = state.hours * state.months * 4;
+
+  return (
+    <div className="reveal">
+      <div className="reveal-inner">
+        <div className="reveal-eyebrow eyebrow">Шаг 03 / 04 · диагностика завершена</div>
+
+        <div className="badge-orb">
+          <span className="badge-corona" />
+          <div className="planet" data-planet="star" style={{ position: "absolute", inset: 18 }}>
+            <div className="planet-surface" />
+            <div className="planet-light" />
+          </div>
+          <div className="badge-orb-icon">{lvl.letter}</div>
+        </div>
+
+        <div className="reveal-level">уровень определён</div>
+        <h1 className="display-2 reveal-title">
+          <span className="aurora-text">{lvl.short}</span>
+        </h1>
+        <p className="reveal-desc">{lvl.desc}</p>
+
+        <div className="reveal-stats">
+          <div className="reveal-stat">
+            <div className="k">Цель</div>
+            <div className="v" style={{ fontSize: 16, lineHeight: 1.3 }}>{state.goal}</div>
+          </div>
+          <div className="reveal-stat">
+            <div className="k">Время</div>
+            <div className="v">{total} ч</div>
+          </div>
+          <div className="reveal-stat">
+            <div className="k">Бюджет</div>
+            <div className="v">{state.budget === 0 ? "0 ₽" : `${state.budget} ₽`}</div>
+          </div>
+        </div>
+
+        <button className="btn btn-primary" onClick={onContinue}>
+          Построить трек
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+            <path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        </button>
+      </div>
+    </div>
+  );
+}
+
+Object.assign(window, { InputScreen, QuizScreen, RevealScreen });
+</script>
+  <script type="text/babel">/* global React */
+const { useState: useStateT, useMemo: useMemoT, useRef: useRefT, useEffect: useEffectT } = React;
+
+const PLAT_SHORT = {
+  stepik:   "St",
+  practicum:"Я",
+  skillbox: "Sb",
+  gb:       "Gb",
+  hexlet:   "Hx",
+  rutube:   "Ru",
+};
+
+// random-ish but deterministic offset per stage so planets don't sit on a single x line
+const X_OFFSETS = [44, 24, 60, 30, 50];
+
+// ─── Constellation list ────────────────────────────────────────────────
+function Constellation({ stages, activeId, completedIds, onPick }) {
+  const NODE_H = 84; // matches gap+row height
+  return (
+    <div className="panel panel-pad" style={{ padding: "22px 18px" }}>
+      <div className="eyebrow" style={{ paddingLeft: 8, marginBottom: 16 }}>созвездие · 5 этапов</div>
+      <div className="constellation">
+        <svg className="constellation-svg" preserveAspectRatio="none">
+          {stages.map((s, i) => {
+            if (i === stages.length - 1) return null;
+            const y1 = 36 + i * NODE_H;
+            const y2 = 36 + (i + 1) * NODE_H;
+            const x1 = X_OFFSETS[i] + 32;
+            const x2 = X_OFFSETS[i + 1] + 32;
+            const done = completedIds.includes(s.id);
+            return (
+              <line key={i}
+                x1={x1} y1={y1} x2={x2} y2={y2}
+                stroke={done ? "rgba(109,240,168,0.45)" : "rgba(140,160,255,0.25)"}
+                strokeWidth="1"
+                strokeDasharray={done ? "0" : "4 5"}
+              />
+            );
+          })}
+        </svg>
+        <div className="constellation-nodes">
+          {stages.map((s, i) => {
+            const isDone = completedIds.includes(s.id);
+            const state = isDone ? "done"
+                        : s.final ? (isDone ? "done" : "final")
+                        : s.id === activeId ? "current"
+                        : (i > 0 && !completedIds.includes(stages[i - 1].id) && s.id !== activeId) ? "locked"
+                        : s.state;
+            const planetState = isDone ? "done" : (s.final ? "final" : state);
+            return (
+              <button
+                key={s.id}
+                className="cnode"
+                data-active={s.id === activeId}
+                data-state={state}
+                onClick={() => onPick(s.id)}
+                style={{ paddingLeft: X_OFFSETS[i] }}
+              >
+                <div className="planet-shell" data-state={planetState} data-planet={s.planet}>
+                  {s.planet === "star" && <span className="corona" />}
+                  <span className="halo" />
+                  <div className="planet" data-planet={s.planet}>
+                    <div className="planet-surface" />
+                    <div className="planet-light" />
+                  </div>
+                  {s.rings && <span className="planet-ring" />}
+                </div>
+                <div className="cnode-info">
+                  <div className="cnode-step">
+                    {s.final ? "Финал" : `Этап ${String(s.id).padStart(2, "0")}`} · {s.weeks} нед
+                  </div>
+                  <div className="cnode-title">{s.title}</div>
+                  <div className="cnode-meta">
+                    {state === "done"    && <span style={{ color: "var(--acc-good)" }}>пройдено</span>}
+                    {state === "current" && <span style={{ color: "var(--acc-1)" }}>текущий этап</span>}
+                    {state === "locked"  && <span className="lock">⚿ откроется после предыдущего</span>}
+                    {state === "final" && !isDone && <span style={{ color: "var(--acc-3)" }}>цель маршрута</span>}
+                  </div>
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Stage detail panel ────────────────────────────────────────────────
+function StageDetail({ stage, goal, level, isLocked, completed, onComplete, onUnlock }) {
+  const [taskOpen, setTaskOpen]         = useStateT(false);
+  const [taskText, setTaskText]         = useStateT("");
+  const [answer, setAnswer]             = useStateT("");
+  const [feedback, setFeedback]         = useStateT(null); // null | "good" | "warn" | "bad"
+  const [feedbackText, setFeedbackText] = useStateT("");
+  const [loadingTask, setLoadingTask]   = useStateT(false);
+  const [loadingFb, setLoadingFb]       = useStateT(false);
+
+  useEffectT(() => {
+    setTaskOpen(false);
+    setTaskText("");
+    setAnswer("");
+    setFeedback(null);
+    setFeedbackText("");
+  }, [stage.id]);
+
+  const getTask = async () => {
+    setLoadingTask(true);
+    try {
+      const res = await fetch("/api/task", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          goal: goal || "обучение",
+          level: level,
+          stage_title: stage.title,
+          stage_content: (stage.topics || []).map(t => t.html).join("; ").slice(0, 400),
+        }),
+      });
+      const data = await res.json();
+      setTaskText(data.task || "Ошибка при генерации задания.");
+    } catch(e) {
+      setTaskText("Ошибка при генерации задания. Попробуй ещё раз.");
+    }
+    setLoadingTask(false);
+  };
+
+  const check = async () => {
+    const len = answer.trim().length;
+    if (len === 0) return;
+    setLoadingFb(true);
+    try {
+      const res = await fetch("/api/feedback", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          goal: goal || "обучение",
+          level: level,
+          task: taskText || stage.task || "",
+          answer: answer,
+        }),
+      });
+      const data = await res.json();
+      setFeedback(data.verdict);
+      setFeedbackText(data.text || "");
+    } catch(e) {
+      setFeedback("bad");
+      setFeedbackText("Ошибка при проверке ответа. Попробуй ещё раз.");
+    }
+    setLoadingFb(false);
+  };
+
+  return (
+    <div className="stage-detail">
+      <div className="panel stage-detail-head">
+        <div className="row">
+          <span className="chip">{stage.final ? "Финал маршрута" : `Этап ${String(stage.id).padStart(2, "0")}`}</span>
+          <span className="chip">{stage.weeks} недель</span>
+          {completed && <span className="chip" style={{ color: "var(--acc-good)", borderColor: "rgba(109,240,168,0.3)", background: "rgba(109,240,168,0.06)" }}>● пройдено</span>}
+          {!completed && !isLocked && <span className="chip chip-lvl">текущий</span>}
+          {isLocked && <span className="chip">⚿ заблокирован</span>}
+        </div>
+        <h3 className="display-3">{stage.title}</h3>
+        <p className="summary">{stage.summary}</p>
+
+        {isLocked && (
+          <div className="warn-banner">
+            <span>⚠️</span>
+            <span>Этот этап откроется автоматически, когда ты завершишь предыдущий. Можно забежать вперёд — но материал будет проще, если идти по порядку.</span>
+          </div>
+        )}
+      </div>
+
+      <div className="stage-grid">
+        <div className="panel section-card">
+          <h4><span className="pip" /> Что изучать</h4>
+          <ul className="topics">
+            {stage.topics.map((t, i) => (
+              <li key={i}><span dangerouslySetInnerHTML={{ __html: t.html }} /></li>
+            ))}
+          </ul>
+          <div className="outcome">
+            <b>Результат этапа.</b> <span dangerouslySetInnerHTML={{ __html: stage.outcome }} />
+          </div>
+        </div>
+
+        <div className="panel section-card">
+          <h4><span className="pip" style={{ background: "var(--acc-2)", boxShadow: "0 0 10px var(--acc-2)" }} /> Материалы этапа</h4>
+          <div className="course-list">
+            {stage.courses.map((c, i) => (
+              <a key={i} className="course" href={c.url || "#"} target={c.url ? "_blank" : undefined} rel="noreferrer">
+                <div className="course-platform" data-p={c.plat}>{PLAT_SHORT[c.plat] || (c.plat ? c.plat[0].toUpperCase() : "?")}</div>
+                <div className="course-info">
+                  <div className="course-name">{c.title}</div>
+                  <div className="course-plat-name">{c.name}</div>
+                </div>
+                <div className="course-price" data-free={c.price === 0}>
+                  {c.price === 0 ? "бесплатно" : c.price ? `${c.price} ₽` : "→"}
+                </div>
+              </a>
+            ))}
+            <a className="course" href={`https://rutube.ru/search/?query=${encodeURIComponent(stage.title)}`} target="_blank" rel="noreferrer">
+              <div className="course-platform" data-p="rutube">Ru</div>
+              <div className="course-info">
+                <div className="course-name">Видео по теме «{stage.title}»</div>
+                <div className="course-plat-name">Rutube · поиск</div>
+              </div>
+              <div className="course-price">→</div>
+            </a>
+          </div>
+        </div>
+      </div>
+
+      <div className="panel task-card">
+        <h4 style={{ marginTop: 0, marginBottom: 14, fontFamily: "var(--ff-display)", fontWeight: 600, fontSize: 16, display: "flex", alignItems: "center", gap: 10 }}>
+          <span className="pip" style={{ background: "var(--acc-3)", boxShadow: "0 0 10px var(--acc-3)" }} />
+          Практическое задание
+        </h4>
+        {!taskOpen ? (
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+            <div style={{ color: "var(--fg-soft)", fontSize: 14, lineHeight: 1.5, maxWidth: "62ch" }}>
+              ИИ сгенерирует задание под текущий этап и уровень <b style={{ color: "var(--fg)" }}>{level}</b>. Ответишь текстом — получишь развёрнутый фидбек.
+            </div>
+            <button className="btn" onClick={() => { setTaskOpen(true); if (!taskText) getTask(); }} disabled={isLocked || loadingTask}>
+              {loadingTask ? "Генерирую задание…" : "🎯 Получить задание"}
+            </button>
+          </div>
+        ) : (
+          <>
+            <div className="task-prompt">
+              <b>Задание · </b>
+              <span>{taskText || stage.task}</span>
+            </div>
+            <textarea
+              className="task-textarea"
+              placeholder="Введи свой ответ. Чем подробнее распишешь логику — тем точнее ИИ оценит."
+              value={answer}
+              onChange={(e) => setAnswer(e.target.value)}
+            />
+            <div className="task-footer">
+              <button className="btn btn-ghost btn-sm" onClick={() => { setTaskOpen(false); setAnswer(""); setFeedback(null); }}>
+                ← Скрыть
+              </button>
+              <button className="btn btn-primary btn-sm" onClick={check} disabled={loadingFb}>
+                {loadingFb ? "Проверяю…" : "Проверить ответ"}
+              </button>
+            </div>
+
+            {feedback === "good" && (
+              <div className="feedback feedback-good">
+                <span className="feedback-verdict">● Верно</span>
+                <span style={{ whiteSpace: "pre-line" }}>{feedbackText}</span>
+              </div>
+            )}
+            {feedback === "warn" && (
+              <div className="feedback feedback-warn">
+                <span className="feedback-verdict">◐ Частично</span>
+                <span style={{ whiteSpace: "pre-line" }}>{feedbackText}</span>
+              </div>
+            )}
+            {feedback === "bad" && (
+              <div className="feedback feedback-bad">
+                <span className="feedback-verdict">✕ Неверно</span>
+                <span style={{ whiteSpace: "pre-line" }}>{feedbackText}</span>
+              </div>
+            )}
+          </>
+        )}
+      </div>
+
+      <div className="stage-actions">
+        {isLocked && (
+          <button className="btn btn-ghost" onClick={onUnlock}>
+            Открыть этап всё равно
+          </button>
+        )}
+        <span className="spacer" />
+        {!completed ? (
+          <button className="btn btn-primary" onClick={onComplete} disabled={isLocked}>
+            ✓ Отметить пройденным
+          </button>
+        ) : (
+          <button className="btn btn-ghost" onClick={onComplete}>
+            Снять отметку
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─── Track wrapper ─────────────────────────────────────────────────────
+function TrackScreen({ state, setState }) {
+  const { LEVELS } = window.PROGRESSORS_DATA;
+  const STAGES = (state.stages && state.stages.length > 0)
+    ? state.stages
+    : window.PROGRESSORS_DATA.STAGES;
+  const lvl = LEVELS[state.level] || LEVELS["Средний уровень"];
+
+  const firstId = STAGES.length > 0 ? STAGES[0].id : 1;
+  const [activeId, setActiveId] = useStateT(firstId);
+  const [completed, setCompleted] = useStateT([]);
+  const [unlocked, setUnlocked]   = useStateT([firstId]);
+  const [toast, setToast]         = useStateT(null);
+
+  const activeStage = useMemoT(() => STAGES.find((s) => s.id === activeId) || STAGES[0], [activeId]);
+
+  const pct = Math.round((completed.length / STAGES.length) * 100);
+
+  const isLocked = (id) => {
+    if (unlocked.includes(id)) return false;
+    // sequential rule: locked if previous stage isn't completed
+    const idx = STAGES.findIndex((s) => s.id === id);
+    if (idx <= 0) return false;
+    return !completed.includes(STAGES[idx - 1].id);
+  };
+
+  const onPick = (id) => {
+    setActiveId(id);
+    if (isLocked(id)) {
+      setToast("⚠️ Этап заблокирован. Пройди предыдущий или открой принудительно.");
+      setTimeout(() => setToast(null), 3000);
+    }
+  };
+
+  const onComplete = () => {
+    const id = activeStage.id;
+    let next;
+    if (completed.includes(id)) {
+      next = completed.filter((x) => x !== id);
+      setToast("Отметка снята.");
+    } else {
+      next = [...completed, id];
+      setToast(`✓ Этап «${activeStage.title}» отмечен как пройденный.`);
+      // auto-unlock next
+      const idx = STAGES.findIndex((s) => s.id === id);
+      const nx = STAGES[idx + 1];
+      if (nx && !unlocked.includes(nx.id)) {
+        setUnlocked([...unlocked, nx.id]);
+        setActiveId(nx.id);
+      }
+    }
+    setCompleted(next);
+    setTimeout(() => setToast(null), 2400);
+  };
+
+  const onUnlock = () => {
+    if (!unlocked.includes(activeStage.id)) {
+      setUnlocked([...unlocked, activeStage.id]);
+      setToast("⚠ Этап открыт. Имей в виду — материал предыдущих этапов мог остаться непокрытым.");
+      setTimeout(() => setToast(null), 3000);
+    }
+  };
+
+  return (
+    <div className="track">
+      <div className="track-header">
+        <div className="track-header-left">
+          <div className="eyebrow" style={{ marginBottom: 8 }}>Шаг 04 / 04 · персональный трек</div>
+          <h2 className="display-2">{state.goal}</h2>
+          <div className="track-meta-row" style={{ marginTop: 12 }}>
+            <span className="chip chip-lvl">★ {lvl.short}</span>
+            <span className="chip">{state.hours} ч/нед</span>
+            <span className="chip">{state.months} мес</span>
+            <span className="chip">{state.budget === 0 ? "бесплатно" : `${state.budget} ₽/мес`}</span>
+            <span className="chip">{STAGES.length} этапов</span>
+          </div>
+        </div>
+        <div className="track-progress">
+          <div className="label">прогресс маршрута</div>
+          <div className="pct">{pct}%</div>
+          <div className="track-progress-bar"><i style={{ width: `${pct}%` }} /></div>
+          <div style={{ marginTop: 8, fontFamily: "var(--ff-mono)", fontSize: 11, color: "var(--fg-mute)", letterSpacing: "0.08em" }}>
+            {completed.length} ИЗ {STAGES.length} ЭТАПОВ
+          </div>
+        </div>
+      </div>
+
+      <div className="track-body">
+        <Constellation
+          stages={STAGES}
+          activeId={activeId}
+          completedIds={completed}
+          onPick={onPick}
+        />
+        <StageDetail
+          stage={activeStage}
+          goal={state.goal}
+          level={lvl.short}
+          isLocked={isLocked(activeStage.id)}
+          completed={completed.includes(activeStage.id)}
+          onComplete={onComplete}
+          onUnlock={onUnlock}
+        />
+      </div>
+
+      {toast && <div className="toast">{toast}</div>}
+    </div>
+  );
+}
+
+Object.assign(window, { TrackScreen });
+</script>
+  <script type="text/babel">/* global React, ReactDOM, Cosmos, Topbar, InputScreen, QuizScreen, RevealScreen, TrackScreen,
+   TweaksPanel, useTweaks, TweakSection, TweakRadio, TweakColor, TweakToggle, TweakSlider */
+const { useState, useEffect, useMemo } = React;
+
+const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
+  "accent": "aurora",
+  "density": "comfortable",
+  "showLines": true,
+  "starsIntensity": 85,
+  "cinematic": false
+}/*EDITMODE-END*/;
+
+const ACCENT_PRESETS = {
+  aurora:    { "--acc-1": "#5cc7ff", "--acc-2": "#8b6dff", "--acc-3": "#f5c067", "--grad-aurora": "linear-gradient(135deg, #5cc7ff 0%, #8b6dff 60%, #f5c067 120%)" },
+  nebula:    { "--acc-1": "#ff7aa8", "--acc-2": "#8b6dff", "--acc-3": "#5cc7ff", "--grad-aurora": "linear-gradient(135deg, #ff7aa8 0%, #8b6dff 55%, #5cc7ff 120%)" },
+  supernova: { "--acc-1": "#ffb454", "--acc-2": "#ff6e9c", "--acc-3": "#fff1a8", "--grad-aurora": "linear-gradient(135deg, #ffb454 0%, #ff6e9c 60%, #fff1a8 120%)" },
+  ion:       { "--acc-1": "#6df0a8", "--acc-2": "#5cc7ff", "--acc-3": "#c9f76d", "--grad-aurora": "linear-gradient(135deg, #6df0a8 0%, #5cc7ff 60%, #c9f76d 120%)" },
+};
+
+function App() {
+  const [t, setTweak] = useTweaks(TWEAK_DEFAULTS);
+
+  // apply accent palette as CSS variables on root
+  useEffect(() => {
+    const root = document.documentElement;
+    const preset = ACCENT_PRESETS[t.accent] || ACCENT_PRESETS.aurora;
+    Object.entries(preset).forEach(([k, v]) => root.style.setProperty(k, v));
+    root.style.setProperty("--stars-opacity", String(t.starsIntensity / 100));
+    root.dataset.density = t.density;
+    root.dataset.cinematic = t.cinematic ? "true" : "false";
+  }, [t]);
+
+  // step machine
+  const [step, setStep] = useState("input");
+  const [loading, setLoading] = useState(false);
+  const [loadingMsg, setLoadingMsg] = useState("");
+  const [error, setError] = useState("");
+  const [state, setState] = useState({
+    goal: "",
+    hours: 10,
+    months: 3,
+    budget: 0,
+    questions: [],
+    answers: [],
+    level: "",
+    stages: [],
+    qaText: "",
+  });
+
+  const submitInput = async () => {
+    setLoading(true);
+    setError("");
+    setLoadingMsg("Проверяем цель…");
+    try {
+      const vRes = await fetch("/api/validate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ goal: state.goal }),
+      });
+      const validate = await vRes.json();
+      if (validate.status === "abstract" || validate.status === "unrealistic") {
+        setError(validate.message || "Уточни цель.");
+        setLoading(false);
+        return;
+      }
+      setLoadingMsg("Составляем вопросы диагностики…");
+      const qRes = await fetch("/api/questions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ goal: state.goal }),
+      });
+      const qData = await qRes.json();
+      setState({ ...state, questions: qData.questions, answers: new Array(qData.questions.length).fill(null) });
+      setStep("quiz");
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    } catch(e) {
+      setError("Ошибка соединения с сервером. Убедись, что сервер запущен.");
+    }
+    setLoading(false);
+  };
+
+  // calculate level on quiz submit (local, no API)
+  const submitQuiz = () => {
+    const score = state.answers.reduce((acc, x) => acc + (x ?? 0), 0);
+    let level;
+    if (score <= 3) level = "Полный новичок";
+    else if (score <= 6) level = "Базовые знания";
+    else if (score <= 9) level = "Средний уровень";
+    else level = "Продвинутый";
+    const OPTS = [
+      "A) Никогда не пробовал / не слышал",
+      "B) Знаком в теории, но не практиковал",
+      "C) Практиковал, есть реальный опыт",
+      "D) Занимаюсь на продвинутом/профессиональном уровне",
+    ];
+    const qaText = (state.questions || []).map((q, i) =>
+      `Вопрос ${i + 1}: ${q.question || q.q}\nОтвет: ${OPTS[state.answers[i]] || OPTS[0]}`
+    ).join("\n\n");
+    setState({ ...state, level, qaText });
+    setStep("reveal");
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  const goToTrack = async () => {
+    setLoading(true);
+    setLoadingMsg("ИИ строит персональный маршрут. Обычно это занимает 30–60 секунд…");
+    setStep("track");
+    window.scrollTo({ top: 0, behavior: "smooth" });
+    try {
+      const res = await fetch("/api/track", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          goal: state.goal,
+          level: state.level,
+          hours: state.hours,
+          months: state.months,
+          budget: state.budget,
+          qa_text: state.qaText || "",
+        }),
+      });
+      const data = await res.json();
+      setState(prev => ({ ...prev, stages: data.stages || [] }));
+    } catch(e) {
+      setError("Ошибка при генерации трека. Попробуй ещё раз.");
+    }
+    setLoading(false);
+  };
+
+  const reset = () => {
+    setStep("input");
+    setError("");
+    setState({
+      goal: "",
+      hours: 10,
+      months: 3,
+      budget: 0,
+      questions: [],
+      answers: [],
+      level: "",
+      stages: [],
+      qaText: "",
+    });
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  return (
+    <>
+      <Cosmos />
+
+      {loading && (
+        <div style={{
+          position: "fixed", inset: 0, zIndex: 200,
+          background: "rgba(5,7,15,0.88)",
+          display: "flex", flexDirection: "column",
+          alignItems: "center", justifyContent: "center",
+          gap: 20, backdropFilter: "blur(10px)",
+        }}>
+          <div className="brand-mark" style={{ width: 56, height: 56, animation: "spin 2s linear infinite" }} />
+          <div style={{ fontFamily: "var(--ff-mono)", fontSize: 13, color: "var(--fg-soft)", letterSpacing: "0.1em", textAlign: "center", maxWidth: 340, lineHeight: 1.6 }}>
+            {loadingMsg}
+          </div>
+        </div>
+      )}
+
+      <div className="app" data-screen-label={
+        step === "input"  ? "01 Ввод цели" :
+        step === "quiz"   ? "02 Диагностика" :
+        step === "reveal" ? "03 Уровень" :
+                            "04 Трек"
+      }>
+        <Topbar step={step} level={state.level} onRestart={reset} />
+
+        {step === "input" && (
+          <InputScreen
+            state={state}
+            setState={setState}
+            error={error}
+            onSubmit={submitInput}
+          />
+        )}
+        {step === "quiz" && (
+          <QuizScreen
+            state={state}
+            setState={setState}
+            onSubmit={submitQuiz}
+            onBack={() => setStep("input")}
+          />
+        )}
+        {step === "reveal" && (
+          <RevealScreen
+            state={state}
+            onContinue={goToTrack}
+          />
+        )}
+        {step === "track" && (
+          <TrackScreen state={state} setState={setState} />
+        )}
+      </div>
+
+      <TweaksPanel title="Tweaks">
+        <TweakSection title="Палитра">
+          <TweakRadio
+            label="Акцент"
+            value={t.accent}
+            onChange={(v) => setTweak("accent", v)}
+            options={[
+              { value: "aurora",    label: "Аврора" },
+              { value: "nebula",    label: "Туманность" },
+              { value: "supernova", label: "Сверхновая" },
+              { value: "ion",       label: "Ионный" },
+            ]}
+          />
+        </TweakSection>
+
+        <TweakSection title="Картинка">
+          <TweakSlider
+            label="Звёзды"
+            value={t.starsIntensity}
+            min={0} max={100} step={5}
+            onChange={(v) => setTweak("starsIntensity", v)}
+          />
+          <TweakToggle
+            label="Кинорежим (доп. свечение)"
+            value={t.cinematic}
+            onChange={(v) => setTweak("cinematic", v)}
+          />
+          <TweakRadio
+            label="Плотность"
+            value={t.density}
+            onChange={(v) => setTweak("density", v)}
+            options={[
+              { value: "comfortable", label: "Комфорт" },
+              { value: "compact",     label: "Компакт" },
+            ]}
+          />
+        </TweakSection>
+
+        <TweakSection title="Демо-навигация">
+          <div style={{ display: "grid", gap: 8 }}>
+            {[
+              ["input",  "01 · Ввод цели"],
+              ["quiz",   "02 · Диагностика"],
+              ["reveal", "03 · Уровень"],
+              ["track",  "04 · Трек"],
+            ].map(([k, label]) => (
+              <button
+                key={k}
+                className="btn btn-ghost btn-sm"
+                style={{ justifyContent: "flex-start" }}
+                onClick={() => { setStep(k); if (k === "reveal" && !state.level) setState({ ...state, level: "Средний уровень" }); window.scrollTo({ top: 0, behavior: "smooth" }); }}
+              >
+                {step === k ? "● " : "○ "}{label}
+              </button>
+            ))}
+          </div>
+        </TweakSection>
+      </TweaksPanel>
+    </>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+</script>
+</body>
+</html>
