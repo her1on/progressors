@@ -1259,6 +1259,58 @@ a { color: inherit; text-decoration: none; }
   .quiz { grid-template-columns: 1fr; padding: 32px 32px 60px; }
 }
 
+@media (max-width: 768px) {
+  .topbar { padding: 14px 20px; gap: 12px; }
+  .brand-tag { display: none; }
+  .topbar-right { gap: 8px; }
+
+  .display-1 { font-size: 38px; }
+  .display-2 { font-size: 26px; }
+  .display-3 { font-size: 20px; }
+  .lede { font-size: 16px; }
+
+  .input-screen { padding: 24px 20px 48px; gap: 32px; }
+  .panel-pad { padding: 20px 18px; }
+  .quiz { padding: 24px 20px 48px; }
+
+  .track { padding: 16px 20px 48px; }
+  .track-header { grid-template-columns: 1fr; gap: 16px; }
+  .track-progress { text-align: left; min-width: unset; }
+  .track-body { grid-template-columns: 1fr; }
+  .stage-detail { position: static; }
+
+  .reveal { padding: 40px 20px; }
+  .reveal-stats { grid-template-columns: 1fr 1fr; }
+  .badge-orb { width: 180px; height: 180px; }
+
+  .stage-actions { gap: 8px; }
+  .task-footer { flex-direction: column; align-items: stretch; }
+}
+
+@media (max-width: 480px) {
+  .topbar { padding: 12px 16px; }
+  .brand-name { font-size: 15px; }
+
+  .display-1 { font-size: 30px; }
+  .display-2 { font-size: 22px; }
+  .display-3 { font-size: 18px; }
+
+  .input-screen { padding: 16px 16px 40px; }
+  .quiz { padding: 16px 16px 40px; }
+  .track { padding: 12px 16px 40px; }
+  .panel-pad { padding: 16px 14px; }
+
+  .reveal { padding: 28px 16px; }
+  .reveal-stats { grid-template-columns: 1fr; }
+  .badge-orb { width: 140px; height: 140px; }
+
+  .track-meta-row { gap: 8px; }
+  .chip { font-size: 10px; padding: 5px 10px; }
+
+  .btn { padding: 10px 16px; font-size: 14px; }
+  .stage-detail-head { padding: 18px 18px; }
+}
+
   </style>
 </head>
 <body>
@@ -2767,12 +2819,22 @@ function App() {
     root.dataset.cinematic = t.cinematic ? "true" : "false";
   }, [t]);
 
+  const LS_KEY = "progressors_session";
+  const loadSession = () => {
+    try {
+      const raw = localStorage.getItem(LS_KEY);
+      if (!raw) return null;
+      return JSON.parse(raw);
+    } catch { return null; }
+  };
+  const saved = loadSession();
+
   // step machine
-  const [step, setStep] = useState("input");
+  const [step, setStep] = useState(saved?.step || "input");
   const [loading, setLoading] = useState(false);
   const [loadingMsg, setLoadingMsg] = useState("");
   const [error, setError] = useState("");
-  const [state, setState] = useState({
+  const [state, setState] = useState(saved?.state || {
     goal: "",
     hours: 10,
     months: 3,
@@ -2783,6 +2845,14 @@ function App() {
     stages: [],
     qaText: "",
   });
+
+  useEffect(() => {
+    if (step === "input" && !state.goal) {
+      localStorage.removeItem(LS_KEY);
+    } else {
+      localStorage.setItem(LS_KEY, JSON.stringify({ step, state }));
+    }
+  }, [step, state]);
 
   const submitInput = async () => {
     setLoading(true);
