@@ -2419,6 +2419,7 @@ function StageDetail({ stage, goal, level, isLocked, completed, onComplete, onUn
   const [feedbackText, setFeedbackText] = useStateT("");
   const [loadingTask, setLoadingTask]   = useStateT(false);
   const [loadingFb, setLoadingFb]       = useStateT(false);
+  const [confirmPending, setConfirmPending] = useStateT(false);
 
   useEffectT(() => {
     setTaskOpen(false);
@@ -2426,6 +2427,7 @@ function StageDetail({ stage, goal, level, isLocked, completed, onComplete, onUn
     setAnswer("");
     setFeedback(null);
     setFeedbackText("");
+    setConfirmPending(false);
   }, [stage.id]);
 
   const getTask = async () => {
@@ -2600,9 +2602,17 @@ function StageDetail({ stage, goal, level, isLocked, completed, onComplete, onUn
         )}
         <span className="spacer" />
         {!completed ? (
-          <button className="btn btn-primary" onClick={onComplete} disabled={isLocked}>
-            ✓ Отметить пройденным
-          </button>
+          confirmPending ? (
+            <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+              <span style={{ fontSize: 13, color: "var(--fg-soft)", fontFamily: "var(--ff-mono)" }}>Задание не выполнено. Продолжить?</span>
+              <button className="btn btn-primary" style={{ padding: "6px 16px" }} onClick={() => { setConfirmPending(false); onComplete(); }}>Да</button>
+              <button className="btn btn-ghost" style={{ padding: "6px 16px" }} onClick={() => setConfirmPending(false)}>Отмена</button>
+            </div>
+          ) : (
+            <button className="btn btn-primary" onClick={() => { feedback === null ? setConfirmPending(true) : onComplete(); }} disabled={isLocked}>
+              ✓ Отметить пройденным
+            </button>
+          )
         ) : (
           <button className="btn btn-ghost" onClick={onComplete}>
             Снять отметку
