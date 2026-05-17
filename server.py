@@ -1,3 +1,4 @@
+import asyncio
 import os
 import re
 from urllib.parse import quote
@@ -6,13 +7,13 @@ from pathlib import Path
 from fastapi import FastAPI, HTTPException
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from dotenv import load_dotenv
 
 load_dotenv()
 
 from gigachat_client import call_gigachat
-from level import COURSES_BY_LEVEL, parse_questions, calculate_level
+from level import COURSES_BY_LEVEL, parse_questions
 from stepik import search_stepik_courses
 
 app = FastAPI(title="Прогрессоры API")
@@ -36,30 +37,30 @@ PLANETS = ["earth", "mars", "jupiter", "neptune", "star"]
 # ── Pydantic models ──────────────────────────────────────────────────────────
 
 class GoalRequest(BaseModel):
-    goal: str
+    goal: str = Field(max_length=200)
 
 class QuestionsRequest(BaseModel):
-    goal: str
+    goal: str = Field(max_length=200)
 
 class TrackRequest(BaseModel):
-    goal: str
-    level: str
-    hours: int
-    months: int
-    budget: int
-    qa_text: str
+    goal: str = Field(max_length=200)
+    level: str = Field(max_length=50)
+    hours: int = Field(ge=1, le=100)
+    months: int = Field(ge=1, le=24)
+    budget: int = Field(ge=0, le=50000)
+    qa_text: str = Field(max_length=4000)
 
 class TaskRequest(BaseModel):
-    goal: str
-    level: str
-    stage_title: str
-    stage_content: str
+    goal: str = Field(max_length=200)
+    level: str = Field(max_length=50)
+    stage_title: str = Field(max_length=200)
+    stage_content: str = Field(max_length=2000)
 
 class FeedbackRequest(BaseModel):
-    goal: str
-    level: str
-    task: str
-    answer: str
+    goal: str = Field(max_length=200)
+    level: str = Field(max_length=50)
+    task: str = Field(max_length=2000)
+    answer: str = Field(max_length=5000)
 
 # ── Track parser ─────────────────────────────────────────────────────────────
 
@@ -101,7 +102,7 @@ def parse_track_to_stages(track_text: str, all_courses: list) -> list:
         # 2 courses per stage from the global pool
         stage_courses = all_courses[idx * 2:(idx + 1) * 2]
 
-        stage: dict = {
+        stages.append({
             "id": idx + 1,
             "planet": PLANETS[idx % len(PLANETS)],
             "title": title,
@@ -112,11 +113,10 @@ def parse_track_to_stages(track_text: str, all_courses: list) -> list:
             "outcome": outcome,
             "courses": stage_courses,
             "task": "",
-        }
-        if idx == 4:
-            stage["final"] = True
+        })
 
-        stages.append(stage)
+    if stages:
+        stages[-1]["final"] = True
 
     return stages
 
@@ -221,27 +221,28 @@ A/B → пробел, включи в трек. C/D → уже владеет, �
 ## 📍 Этап 2: [Название]
 ...до Этапа 5. Последний — финальный проект / портфолио."""
 
-    try:
-        track_text = call_gigachat(prompt)
-    except Exception as e:
-        raise HTTPException(500, f"GigaChat error: {e}")
-
-    # Stepik courses
-    try:
-        stepik_raw = search_stepik_courses(req.goal, req.budget, limit)
-    except Exception:
-        stepik_raw = []
-
-    # Platform courses via GigaChat
     plat_prompt = f"""Назови 2-3 реальных курса по теме «{req.goal}» с российских платформ.
 Платформы: Яндекс Практикум, Skillbox, GeekBrains, Hexlet.
 Формат строго: Платформа | Название курса
 Только реальные существующие курсы. Без пояснений."""
 
-    try:
-        plat_raw = call_gigachat(plat_prompt)
-    except Exception:
-        plat_raw = ""
+    # Запускаем все три вызова параллельно
+    results = await asyncio.gather(
+        asyncio.to_thread(call_gigachat, prompt),
+        asyncio.to_thread(search_stepik_courses, req.goal, req.budget, limit),
+        asyncio.to_thread(call_gigachat, plat_prompt),
+        return_exceptions=True,
+    )
+
+    track_result, stepik_result, plat_result = results
+
+    if isinstance(track_result, Exception):
+        print(f"ERROR /api/track — GigaChat track: {track_result}")
+        raise HTTPException(500, "Не удалось сгенерировать трек. Попробуй ещё раз.")
+
+    track_text = track_result
+    stepik_raw = [] if isinstance(stepik_result, Exception) else stepik_result
+    plat_raw = "" if isinstance(plat_result, Exception) else plat_result
 
     all_courses = []
 
@@ -298,7 +299,8 @@ async def generate_task(req: TaskRequest):
         task = call_gigachat(prompt)
         return {"task": task.strip()}
     except Exception as e:
-        raise HTTPException(500, str(e))
+        print(f"ERROR /api/task: {e}")
+        raise HTTPException(500, "Не удалось сгенерировать задание. Попробуй ещё раз.")
 
 
 @app.post("/api/feedback")
@@ -327,7 +329,8 @@ async def check_feedback(req: FeedbackRequest):
     try:
         fb = call_gigachat(prompt).strip()
     except Exception as e:
-        raise HTTPException(500, str(e))
+        print(f"ERROR /api/feedback: {e}")
+        raise HTTPException(500, "Не удалось проверить ответ. Попробуй ещё раз.")
 
     first_line = fb.split("\n")[0].strip().strip("*").rstrip(".!").lower()
     if first_line == "верно":

@@ -2795,6 +2795,10 @@ function App() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ goal: state.goal }),
       });
+      if (!qRes.ok) {
+        const err = await qRes.json().catch(() => ({}));
+        throw new Error(err.detail || `Ошибка сервера ${qRes.status}`);
+      }
       const qData = await qRes.json();
       setState({ ...state, questions: qData.questions, answers: new Array(qData.questions.length).fill(null) });
       setStep("quiz");
@@ -2845,6 +2849,10 @@ function App() {
           qa_text: state.qaText || "",
         }),
       });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.detail || `Ошибка сервера ${res.status}`);
+      }
       const data = await res.json();
       setState(prev => ({ ...prev, stages: data.stages || [] }));
     } catch(e) {
