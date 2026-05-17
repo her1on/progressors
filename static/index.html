@@ -2845,7 +2845,9 @@ function App() {
   };
   const saved = (() => {
     const s = loadSession();
-    if (s?.step === "track" && (!s?.state?.stages || s.state.stages.length === 0)) return null;
+    if (s?.step === "track" && (!s?.state?.stages || s.state.stages.length === 0)) {
+      return { ...s, step: "reveal" };
+    }
     return s;
   })();
 
@@ -2935,6 +2937,7 @@ function App() {
   const goToTrack = async () => {
     setLoading(true);
     setLoadingMsg("ИИ строит персональный маршрут. Обычно это занимает 30–60 секунд…");
+    setStep("track");
     window.scrollTo({ top: 0, behavior: "smooth" });
     try {
       const res = await fetch("/api/track", {
@@ -2955,8 +2958,8 @@ function App() {
       }
       const data = await res.json();
       setState(prev => ({ ...prev, stages: data.stages || [] }));
-      setStep("track");
     } catch(e) {
+      setStep("reveal");
       setError("Ошибка при генерации трека. Попробуй ещё раз.");
     }
     setLoading(false);
