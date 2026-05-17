@@ -2113,7 +2113,7 @@ function Segmented({ options, value, onChange }) {
 Object.assign(window, { Topbar, Cosmos, CosmicSlider, Segmented });
 </script>
   <script type="text/babel">/* global React, CosmicSlider, Segmented */
-const { useState: useStateS, useEffect: useEffectS, useMemo: useMemoS } = React;
+const { useState: useStateS, useEffect: useEffectS, useMemo: useMemoS, useRef: useRefS } = React;
 
 const BUDGET_OPTS = [
   { value: 0,     label: "Бесплатно" },
@@ -2258,6 +2258,13 @@ function QuizScreen({ state, setState, onSubmit, onBack }) {
   const answers = state.answers;
   const answered = answers.filter((a) => a !== null).length;
   const allDone = answered === Q.length;
+  const footerRef = useRefS(null);
+
+  useEffectS(() => {
+    if (allDone && footerRef.current) {
+      footerRef.current.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+  }, [allDone]);
 
   const choose = (qi, oi) => {
     const next = [...answers];
@@ -2315,7 +2322,7 @@ function QuizScreen({ state, setState, onSubmit, onBack }) {
           </div>
         ))}
 
-        <div className="quiz-footer">
+        <div className="quiz-footer" ref={footerRef}>
           <span className="progress-text">{answered} / {Q.length} ответов</span>
           <button className="btn btn-primary" disabled={!allDone} onClick={onSubmit}>
             Определить уровень
