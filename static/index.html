@@ -440,6 +440,7 @@ a { color: inherit; text-decoration: none; }
   line-height: 1.45;
 }
 .alert-warn { background: rgba(255,138,110,0.07); border: 1px solid rgba(255,138,110,0.25); color: #ffc7b6; }
+.alert-info { background: rgba(92,199,255,0.07); border: 1px solid rgba(92,199,255,0.25); color: #a8dcf0; }
 
 /* ─── quiz screen ──────────────────────────────────────────────────── */
 .quiz {
@@ -2071,7 +2072,7 @@ const BUDGET_NOTES = {
 function InputScreen({ state, setState, onSubmit, error }) {
   const { goal, hours, months, budget } = state;
   const total = hours * months * 4;
-  const tooFew = total < 8;
+  const fewHours = total < 20;
 
   return (
     <div className="input-screen">
@@ -2107,7 +2108,7 @@ function InputScreen({ state, setState, onSubmit, error }) {
 
       <form
         className="panel panel-pad form-card"
-        onSubmit={(e) => { e.preventDefault(); if (!tooFew && goal.trim()) onSubmit(); }}
+        onSubmit={(e) => { e.preventDefault(); if (goal.trim()) onSubmit(); }}
       >
         <div className="field">
           <label className="field-label">
@@ -2160,9 +2161,9 @@ function InputScreen({ state, setState, onSubmit, error }) {
           <div className="budget-note">{BUDGET_NOTES[budget]}</div>
         </div>
 
-        {tooFew && (
-          <div className="alert alert-warn">
-            <span>⛔ Слишком мало времени: {total} ч за весь срок. Для реального результата нужно минимум 8 часов суммарно.</span>
+        {fewHours && (
+          <div className="alert alert-info">
+            <span>💡 Суммарно {total} ч за весь срок — этого может быть мало. Прогресс будет медленным, но реальным.</span>
           </div>
         )}
         {error && (
@@ -2172,7 +2173,7 @@ function InputScreen({ state, setState, onSubmit, error }) {
         )}
 
         <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
-          <button type="submit" className="btn btn-primary" disabled={tooFew || !goal.trim()}>
+          <button type="submit" className="btn btn-primary" disabled={!goal.trim()}>
             Запустить диагностику
             <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
               <path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
