@@ -2130,7 +2130,7 @@ const BUDGET_NOTES = {
 };
 
 // ─── Input screen ──────────────────────────────────────────────────────
-function InputScreen({ state, setState, onSubmit, error }) {
+function InputScreen({ state, setState, onSubmit, error, institutionalMsg, onInstitutionalContinue, onInstitutionalBack }) {
   const { goal, hours, months, budget } = state;
   const total = hours * months * 4;
   const fewHours = total < 20;
@@ -2232,9 +2232,23 @@ function InputScreen({ state, setState, onSubmit, error }) {
             <span>⚠️ {error}</span>
           </div>
         )}
+        {institutionalMsg && (
+          <div className="alert alert-warn" style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+            <span>🏛️ <b>Особые требования к профессии</b></span>
+            <span style={{ fontSize: 13 }}>{institutionalMsg}</span>
+            <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+              <button type="button" className="btn btn-primary" style={{ fontSize: 13, padding: "8px 16px" }} onClick={onInstitutionalContinue}>
+                Продолжить всё равно
+              </button>
+              <button type="button" className="btn" style={{ fontSize: 13, padding: "8px 16px", background: "rgba(255,255,255,0.05)", border: "1px solid var(--border-hard)", color: "var(--fg-soft)" }} onClick={onInstitutionalBack}>
+                Скорректировать цель
+              </button>
+            </div>
+          </div>
+        )}
 
         <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
-          <button type="submit" className="btn btn-primary" disabled={!goal.trim()}>
+          <button type="submit" className="btn btn-primary" disabled={!goal.trim() || !!institutionalMsg}>
             Запустить диагностику
             <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
               <path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
@@ -2856,6 +2870,7 @@ function App() {
   const [loading, setLoading] = useState(false);
   const [loadingMsg, setLoadingMsg] = useState("");
   const [error, setError] = useState("");
+  const [institutionalMsg, setInstitutionalMsg] = useState("");
   const [state, setState] = useState(saved?.state || {
     goal: "",
     hours: 10,
@@ -2876,9 +2891,35 @@ function App() {
     }
   }, [step, state]);
 
+  const fetchQuestions = async () => {
+    setInstitutionalMsg("");
+    setError("");
+    setLoading(true);
+    setLoadingMsg("Составляем вопросы диагностики…");
+    try {
+      const qRes = await fetch("/api/questions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ goal: state.goal }),
+      });
+      if (!qRes.ok) {
+        const err = await qRes.json().catch(() => ({}));
+        throw new Error(err.detail || `Ошибка сервера ${qRes.status}`);
+      }
+      const qData = await qRes.json();
+      setState({ ...state, questions: qData.questions, answers: new Array(qData.questions.length).fill(null) });
+      setStep("quiz");
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    } catch(e) {
+      setError("Ошибка соединения с сервером. Убедись, что сервер запущен.");
+    }
+    setLoading(false);
+  };
+
   const submitInput = async () => {
     setLoading(true);
     setError("");
+    setInstitutionalMsg("");
     setLoadingMsg("Проверяем цель…");
     try {
       const vRes = await fetch("/api/validate", {
@@ -2889,6 +2930,11 @@ function App() {
       const validate = await vRes.json();
       if (validate.status === "abstract" || validate.status === "unrealistic") {
         setError(validate.message || "Уточни цель.");
+        setLoading(false);
+        return;
+      }
+      if (validate.status === "institutional") {
+        setInstitutionalMsg(validate.message || "Эта профессия требует специального отбора.");
         setLoading(false);
         return;
       }
@@ -3015,6 +3061,9 @@ function App() {
             setState={setState}
             error={error}
             onSubmit={submitInput}
+            institutionalMsg={institutionalMsg}
+            onInstitutionalContinue={fetchQuestions}
+            onInstitutionalBack={() => setInstitutionalMsg("")}
           />
         )}
         {step === "quiz" && (
