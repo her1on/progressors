@@ -32,7 +32,7 @@ PLAT_KEY = {
     "Hexlet":           "hexlet",
 }
 
-PLANETS = ["earth", "mars", "jupiter", "neptune", "star"]
+PLANETS = ["earth", "mars", "jupiter", "neptune"]
 
 # ── Pydantic models ──────────────────────────────────────────────────────────
 
