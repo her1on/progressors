@@ -1,4 +1,5 @@
 import asyncio
+import html as html_lib
 import os
 import re
 from urllib.parse import quote
@@ -87,15 +88,15 @@ def parse_track_to_stages(track_text: str) -> list:
         for line in topics_text.splitlines():
             line = line.strip().lstrip("-•*·").strip()
             if len(line) > 5:
-                topics.append({"html": line})
+                topics.append({"html": html_lib.escape(line)})
         if not topics and topics_text:
             for item in re.split(r"[;,]", topics_text):
                 item = item.strip()
                 if len(item) > 5:
-                    topics.append({"html": item})
+                    topics.append({"html": html_lib.escape(item)})
 
         outcome_match = re.search(r"\*\*Результат:\*\*\s*(.+?)(?=\n##|\Z)", part, re.DOTALL)
-        outcome = outcome_match.group(1).strip().replace("\n", " ") if outcome_match else ""
+        outcome = html_lib.escape(outcome_match.group(1).strip().replace("\n", " ")) if outcome_match else ""
 
         summary = topics_text[:220].rstrip() + ("…" if len(topics_text) > 220 else "")
 
@@ -170,7 +171,7 @@ async def validate_goal(req: GoalRequest):
 Не добавляй ничего лишнего."""
 
     try:
-        raw = call_gigachat(prompt)
+        raw = await asyncio.to_thread(call_gigachat, prompt)
         lines = raw.strip().splitlines()
         first = lines[0].strip()
         explanation = lines[1].strip() if len(lines) > 1 else ""
@@ -212,7 +213,7 @@ D) Занимаюсь на продвинутом/профессионально
 Не добавляй пояснений, markdown-блоков, комментариев — только JSON-массив."""
 
     try:
-        raw = call_gigachat(prompt)
+        raw = await asyncio.to_thread(call_gigachat, prompt)
         questions = parse_questions(raw)
         if not questions:
             raise HTTPException(500, "Не удалось распарсить вопросы")
@@ -349,7 +350,7 @@ async def generate_task(req: TaskRequest):
 Напиши ТОЛЬКО текст задания, без вводных слов и пояснений."""
 
     try:
-        task = call_gigachat(prompt)
+        task = await asyncio.to_thread(call_gigachat, prompt)
         return {"task": task.strip()}
     except Exception as e:
         print(f"ERROR /api/task: {e}")
@@ -382,7 +383,7 @@ async def check_feedback(req: FeedbackRequest):
 Тон: поддерживающий и конкретный. Не используй общие фразы типа «Молодец!» без объяснения."""
 
     try:
-        fb = call_gigachat(prompt).strip()
+        fb = (await asyncio.to_thread(call_gigachat, prompt)).strip()
     except Exception as e:
         print(f"ERROR /api/feedback: {e}")
         raise HTTPException(500, "Не удалось проверить ответ. Попробуй ещё раз.")

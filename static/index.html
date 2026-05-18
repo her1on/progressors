@@ -2183,7 +2183,7 @@ function InputScreen({ state, setState, onSubmit, error, institutionalMsg, onIns
             placeholder="Например: Python-разработка, ML, веб-дизайн"
             value={goal}
             maxLength={100}
-            onChange={(e) => setState({ ...state, goal: e.target.value })}
+            onChange={(e) => { setState({ ...state, goal: e.target.value }); if (institutionalMsg) onInstitutionalBack(); }}
           />
         </div>
 
@@ -2426,15 +2426,15 @@ function Constellation({ stages, activeId, completedIds, onPick }) {
   const NODE_H = 84; // matches gap+row height
   return (
     <div className="panel panel-pad" style={{ padding: "22px 18px" }}>
-      <div className="eyebrow" style={{ paddingLeft: 8, marginBottom: 16 }}>созвездие · 5 этапов</div>
+      <div className="eyebrow" style={{ paddingLeft: 8, marginBottom: 16 }}>созвездие · {stages.length} этапов</div>
       <div className="constellation">
         <svg className="constellation-svg" preserveAspectRatio="none">
           {stages.map((s, i) => {
             if (i === stages.length - 1) return null;
             const y1 = 36 + i * NODE_H;
             const y2 = 36 + (i + 1) * NODE_H;
-            const x1 = X_OFFSETS[i] + 32;
-            const x2 = X_OFFSETS[i + 1] + 32;
+            const x1 = X_OFFSETS[i % X_OFFSETS.length] + 32;
+            const x2 = X_OFFSETS[(i + 1) % X_OFFSETS.length] + 32;
             const done = completedIds.includes(s.id);
             return (
               <line key={i}
@@ -2462,7 +2462,7 @@ function Constellation({ stages, activeId, completedIds, onPick }) {
                 data-active={s.id === activeId}
                 data-state={state}
                 onClick={() => onPick(s.id)}
-                style={{ paddingLeft: X_OFFSETS[i] }}
+                style={{ paddingLeft: X_OFFSETS[i % X_OFFSETS.length] }}
               >
                 <div className="planet-shell" data-state={planetState} data-planet={s.planet}>
                   {s.planet === "star" && <span className="corona" />}
@@ -3055,6 +3055,7 @@ function App() {
       level: "",
       stages: [],
       qaText: "",
+      courses: {},
     });
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
