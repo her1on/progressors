@@ -296,12 +296,18 @@ Skillbox | Python-разработчик с нуля
 Только реальные существующие курсы. Без пояснений и лишнего текста."""
 
     # Запускаем все три вызова параллельно
-    results = await asyncio.gather(
-        asyncio.to_thread(call_gigachat, prompt),
-        asyncio.to_thread(search_stepik_courses, req.goal, req.budget, limit),
-        asyncio.to_thread(call_gigachat, plat_prompt),
-        return_exceptions=True,
-    )
+    try:
+        results = await asyncio.wait_for(
+            asyncio.gather(
+                asyncio.to_thread(call_gigachat, prompt),
+                asyncio.to_thread(search_stepik_courses, req.goal, req.budget, limit),
+                asyncio.to_thread(call_gigachat, plat_prompt),
+                return_exceptions=True,
+            ),
+            timeout=120,
+        )
+    except asyncio.TimeoutError:
+        raise HTTPException(504, "Генерация трека заняла слишком много времени. Попробуй ещё раз.")
 
     track_result, stepik_result, plat_result = results
 

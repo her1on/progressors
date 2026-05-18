@@ -11,6 +11,7 @@ def call_gigachat(prompt: str) -> str:
             credentials=os.getenv("GIGACHAT_AUTH_KEY"),
             scope="GIGACHAT_API_PERS",
             verify_ssl_certs=False,
+            timeout=90,
         )
     try:
         return _local.client.chat(prompt).choices[0].message.content
