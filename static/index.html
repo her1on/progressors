@@ -2716,23 +2716,36 @@ function Constellation({ stages, activeId, completedIds, onPick }) {
 }
 
 // ─── Stage detail panel ────────────────────────────────────────────────
-function StageDetail({ stage, goal, level, isLocked, completed, onComplete, onUnlock }) {
+function StageDetail({ stage, goal, level, isLocked, completed, onComplete, onUnlock, savedTask, setTasksByStage }) {
   const [taskOpen, setTaskOpen]         = useStateT(false);
   const [taskText, setTaskText]         = useStateT("");
   const [answer, setAnswer]             = useStateT("");
-  const [feedback, setFeedback]         = useStateT(null); // null | "good" | "warn" | "bad"
+  const [feedback, setFeedback]         = useStateT(null);
   const [feedbackText, setFeedbackText] = useStateT("");
   const [loadingTask, setLoadingTask]   = useStateT(false);
   const [loadingFb, setLoadingFb]       = useStateT(false);
   const [confirmPending, setConfirmPending] = useStateT(false);
 
+  // Ref всегда хранит актуальный стейт задания — читается в cleanup
+  const taskStateRef = useRefT({});
   useEffectT(() => {
-    setTaskOpen(false);
-    setTaskText("");
-    setAnswer("");
-    setFeedback(null);
-    setFeedbackText("");
+    taskStateRef.current = { taskText, taskOpen, answer, feedback, feedbackText };
+  });
+
+  // При смене этапа: сохраняем стейт старого (через cleanup), загружаем нового
+  useEffectT(() => {
+    const saved = savedTask || {};
+    setTaskOpen(!!saved.taskText);
+    setTaskText(saved.taskText || "");
+    setAnswer(saved.answer || "");
+    setFeedback(saved.feedback || null);
+    setFeedbackText(saved.feedbackText || "");
     setConfirmPending(false);
+    return () => {
+      // cleanup: stage.id здесь — это OLD id (замыкание)
+      const sid = stage.id;
+      setTasksByStage(prev => ({ ...prev, [sid]: taskStateRef.current }));
+    };
   }, [stage.id]);
 
   const getTask = async () => {
@@ -2827,7 +2840,7 @@ function StageDetail({ stage, goal, level, isLocked, completed, onComplete, onUn
             <div style={{ color: "var(--fg-soft)", fontSize: 14, lineHeight: 1.5, maxWidth: "62ch" }}>
               ИИ сгенерирует задание под текущий этап и уровень <b style={{ color: "var(--fg)" }}>{level}</b>. Ответишь текстом — получишь развёрнутый фидбек.
             </div>
-            <button className="btn" onClick={() => { setTaskOpen(true); if (!taskText) getTask(); }} disabled={isLocked || loadingTask}>
+            <button className="btn" onClick={() => { setTaskOpen(true); if (!taskText) getTask(); }} disabled={loadingTask}>
               {loadingTask ? "Генерирую задание…" : "🎯 Получить задание"}
             </button>
           </div>
@@ -2957,11 +2970,12 @@ function TrackScreen({ state, setState, onRestart }) {
   const lvl = LEVELS[state.level] || LEVELS["Средний уровень"];
 
   const firstId = STAGES.length > 0 ? STAGES[0].id : 1;
-  const [activeId, setActiveId]     = useStateT(firstId);
-  const [completed, setCompleted]   = useStateT([]);
-  const [unlocked, setUnlocked]     = useStateT([firstId]);
-  const [toast, setToast]           = useStateT(null);
+  const [activeId, setActiveId]         = useStateT(firstId);
+  const [completed, setCompleted]       = useStateT([]);
+  const [unlocked, setUnlocked]         = useStateT([firstId]);
+  const [toast, setToast]               = useStateT(null);
   const [showComplete, setShowComplete] = useStateT(false);
+  const [tasksByStage, setTasksByStage] = useStateT({});
 
   useEffectT(() => {
     if (STAGES.length > 0 && completed.length === STAGES.length) {
@@ -2969,7 +2983,9 @@ function TrackScreen({ state, setState, onRestart }) {
     }
   }, [completed]);
 
-  const activeStage = useMemoT(() => STAGES.find((s) => s.id === activeId) || STAGES[0], [activeId]);
+  // Не используем useMemo — он кэширует по [activeId] и не замечает
+  // обновления STAGES (когда API вернул данные после первого рендера)
+  const activeStage = STAGES.find((s) => s.id === activeId) || STAGES[0];
 
   const pct = Math.round((completed.length / STAGES.length) * 100);
 
@@ -3070,6 +3086,8 @@ function TrackScreen({ state, setState, onRestart }) {
           completed={completed.includes(activeStage.id)}
           onComplete={onComplete}
           onUnlock={onUnlock}
+          savedTask={tasksByStage[activeStage.id] || {}}
+          setTasksByStage={setTasksByStage}
         />
       </div>
 
