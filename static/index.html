@@ -2594,31 +2594,6 @@ function StageDetail({ stage, goal, level, isLocked, completed, onComplete, onUn
           </div>
         </div>
 
-        <div className="panel section-card">
-          <h4><span className="pip" style={{ background: "var(--acc-2)", boxShadow: "0 0 10px var(--acc-2)" }} /> Материалы этапа</h4>
-          <div className="course-list">
-            {stage.courses.map((c, i) => (
-              <a key={i} className="course" href={c.url || "#"} target={c.url ? "_blank" : undefined} rel="noreferrer">
-                <div className="course-platform" data-p={c.plat}>{PLAT_SHORT[c.plat] || (c.plat ? c.plat[0].toUpperCase() : "?")}</div>
-                <div className="course-info">
-                  <div className="course-name">{c.title}</div>
-                  <div className="course-plat-name">{c.name}</div>
-                </div>
-                <div className="course-price" data-free={c.price === 0}>
-                  {c.price === 0 ? "бесплатно" : c.price ? `${c.price} ₽` : "→"}
-                </div>
-              </a>
-            ))}
-            <a className="course" href={`https://rutube.ru/search/?query=${encodeURIComponent(stage.title)}`} target="_blank" rel="noreferrer">
-              <div className="course-platform" data-p="rutube">Ru</div>
-              <div className="course-info">
-                <div className="course-name">Видео по теме «{stage.title}»</div>
-                <div className="course-plat-name">Rutube · поиск</div>
-              </div>
-              <div className="course-price">→</div>
-            </a>
-          </div>
-        </div>
       </div>
 
       <div className="panel task-card">
@@ -2812,6 +2787,61 @@ function TrackScreen({ state, setState }) {
         />
       </div>
 
+      {((state.courses?.stepik?.length > 0) || (state.courses?.platforms?.length > 0)) && (
+        <div className="panel panel-pad" style={{ marginTop: 24 }}>
+          <h3 style={{ fontFamily: "var(--ff-display)", fontSize: 18, fontWeight: 700, marginBottom: 16, marginTop: 0 }}>
+            Курсы по теме
+          </h3>
+          {state.courses.stepik?.length > 0 && (
+            <div style={{ marginBottom: 16 }}>
+              <div className="eyebrow" style={{ marginBottom: 10 }}>Stepik</div>
+              <div className="course-list">
+                {state.courses.stepik.map((c, i) => (
+                  <a key={i} className="course" href={c.url} target="_blank" rel="noreferrer">
+                    <div className="course-platform" data-p="stepik">St</div>
+                    <div className="course-info">
+                      <div className="course-name">{c.title}</div>
+                      <div className="course-plat-name">Stepik</div>
+                    </div>
+                    <div className="course-price" data-free={c.price === 0}>
+                      {c.price === 0 ? "бесплатно" : c.price ? `${c.price} ₽` : "→"}
+                    </div>
+                  </a>
+                ))}
+              </div>
+            </div>
+          )}
+          {state.courses.platforms?.length > 0 && (
+            <div style={{ marginBottom: 16 }}>
+              <div className="eyebrow" style={{ marginBottom: 10 }}>Крупные платформы</div>
+              <div className="course-list">
+                {state.courses.platforms.map((c, i) => (
+                  <a key={i} className="course" href={c.url} target="_blank" rel="noreferrer">
+                    <div className="course-platform" data-p={c.plat}>{PLAT_SHORT[c.plat] || c.name[0]}</div>
+                    <div className="course-info">
+                      <div className="course-name">{c.title}</div>
+                      <div className="course-plat-name">{c.name}</div>
+                    </div>
+                    <div className="course-price">→</div>
+                  </a>
+                ))}
+              </div>
+            </div>
+          )}
+          <div className="eyebrow" style={{ marginBottom: 10 }}>Rutube</div>
+          <div className="course-list">
+            <a className="course" href={`https://rutube.ru/search/?query=${encodeURIComponent(state.goal)}`} target="_blank" rel="noreferrer">
+              <div className="course-platform" data-p="rutube">Ru</div>
+              <div className="course-info">
+                <div className="course-name">Видео по теме «{state.goal}»</div>
+                <div className="course-plat-name">Rutube · поиск</div>
+              </div>
+              <div className="course-price">→</div>
+            </a>
+          </div>
+        </div>
+      )}
+
       {toast && <div className="toast">{toast}</div>}
     </div>
   );
@@ -2883,6 +2913,7 @@ function App() {
     level: "",
     stages: [],
     qaText: "",
+    courses: {},
   });
 
   useEffect(() => {
@@ -3005,7 +3036,7 @@ function App() {
         throw new Error(err.detail || `Ошибка сервера ${res.status}`);
       }
       const data = await res.json();
-      setState(prev => ({ ...prev, stages: data.stages || [] }));
+      setState(prev => ({ ...prev, stages: data.stages || [], courses: data.courses || {} }));
     } catch(e) {
       setStep("reveal");
       setError("Ошибка при генерации трека. Попробуй ещё раз.");

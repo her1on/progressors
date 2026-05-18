@@ -64,7 +64,7 @@ class FeedbackRequest(BaseModel):
 
 # ── Track parser ─────────────────────────────────────────────────────────────
 
-def parse_track_to_stages(track_text: str, all_courses: list) -> list:
+def parse_track_to_stages(track_text: str) -> list:
     stages = []
     parts = re.split(r"\n(?=##\s)", "\n" + track_text.strip())
 
@@ -99,9 +99,6 @@ def parse_track_to_stages(track_text: str, all_courses: list) -> list:
 
         summary = topics_text[:220].rstrip() + ("…" if len(topics_text) > 220 else "")
 
-        # 2 courses per stage from the global pool
-        stage_courses = all_courses[idx * 2:(idx + 1) * 2]
-
         stages.append({
             "id": idx + 1,
             "planet": PLANETS[idx % len(PLANETS)],
@@ -111,7 +108,6 @@ def parse_track_to_stages(track_text: str, all_courses: list) -> list:
             "summary": summary,
             "topics": topics[:6],
             "outcome": outcome,
-            "courses": stage_courses,
             "task": "",
         })
 
@@ -306,17 +302,12 @@ Skillbox | Python-разработчик с нуля
     stepik_raw = [] if isinstance(stepik_result, Exception) else stepik_result
     plat_raw = "" if isinstance(plat_result, Exception) else plat_result
 
-    all_courses = []
+    stepik_courses = [
+        {"plat": "stepik", "name": "Stepik", "title": c["title"], "price": c["price"], "url": c["url"]}
+        for c in stepik_raw
+    ]
 
-    for c in stepik_raw:
-        all_courses.append({
-            "plat": "stepik",
-            "name": "Stepik",
-            "title": c["title"],
-            "price": c["price"],
-            "url": c["url"],
-        })
-
+    platform_courses = []
     for line in plat_raw.strip().splitlines():
         if "|" not in line:
             continue
@@ -326,7 +317,7 @@ Skillbox | Python-разработчик с нуля
         platform, course_name = parts[0].strip(), parts[1].strip()
         for p_name, url_tpl in PLATFORM_SEARCH_URLS.items():
             if p_name.lower() in platform.lower():
-                all_courses.append({
+                platform_courses.append({
                     "plat": PLAT_KEY.get(p_name, "stepik"),
                     "name": p_name,
                     "title": course_name,
@@ -335,12 +326,12 @@ Skillbox | Python-разработчик с нуля
                 })
                 break
 
-    stages = parse_track_to_stages(track_text, all_courses)
+    stages = parse_track_to_stages(track_text)
 
     if not stages:
         raise HTTPException(500, "Не удалось распарсить трек. Попробуй ещё раз.")
 
-    return {"stages": stages}
+    return {"stages": stages, "courses": {"stepik": stepik_courses, "platforms": platform_courses}}
 
 
 @app.post("/api/task")
