@@ -117,6 +117,7 @@ def parse_track_to_stages(track_text: str, all_courses: list) -> list:
 
     if stages:
         stages[-1]["final"] = True
+        stages[-1]["planet"] = "star"
 
     return stages
 
