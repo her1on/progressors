@@ -3318,7 +3318,6 @@ function App() {
   const goToTrack = async () => {
     setLoading(true);
     setLoadingMsg("ИИ строит персональный маршрут. Обычно это занимает 30–60 секунд…");
-    setStep("track");
     window.scrollTo({ top: 0, behavior: "smooth" });
     try {
       const res = await fetch("/api/track", {
@@ -3338,9 +3337,11 @@ function App() {
         throw new Error(err.detail || `Ошибка сервера ${res.status}`);
       }
       const data = await res.json();
+      // Сначала кладём данные, потом переключаем шаг —
+      // так TrackScreen монтируется уже с правильными этапами
       setState(prev => ({ ...prev, stages: data.stages || [], courses: data.courses || {} }));
+      setStep("track");
     } catch(e) {
-      setStep("reveal");
       setError("Ошибка при генерации трека. Попробуй ещё раз.");
     }
     setLoading(false);
