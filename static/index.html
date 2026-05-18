@@ -1535,121 +1535,10 @@ const LEVELS = {
   "Продвинутый":    { letter: "Э", short: "Эксперт",   desc: "Ты в топе. Двигаемся в архитектуру, mentoring и open source." },
 };
 
-const STAGES = [
-  {
-    id: 1,
-    planet: "earth",
-    title: "Профессиональный Python",
-    weeks: 2,
-    state: "done",
-    summary: "Сначала закрепим всё, что отделяет хобби-скрипты от продакшен-кода: типизация, контекст-менеджеры, чистая структура модулей.",
-    topics: [
-      { html: "Type hints и <code>mypy</code>, протоколы и <code>typing.Protocol</code>" },
-      { html: "Генераторы, <code>yield</code>, корутины и контекст-менеджеры" },
-      { html: "<code>dataclasses</code>, <code>attrs</code>, паттерны структурирования модулей" },
-      { html: "Логирование через <code>logging</code> и работа с <code>pathlib</code>" },
-    ],
-    outcome: "Пишешь идиоматичный, типизированный Python-код, который читается как документация.",
-    courses: [
-      { plat: "stepik",    name: "Stepik",            title: "Python: основы и применение", price: 0 },
-      { plat: "hexlet",    name: "Hexlet",            title: "Python: настройка окружения и продвинутые приёмы", price: 0 },
-      { plat: "practicum", name: "Яндекс Практикум",  title: "Python-разработчик · буткемп", price: 7900 },
-    ],
-    task: "Спроектируй модуль <b>orders.py</b>, в котором есть dataclass Order, функция-валидатор и генератор по списку файлов JSON. Опиши публичный интерфейс модуля и приведи примеры использования.",
-  },
-  {
-    id: 2,
-    planet: "mars",
-    title: "Базы данных и SQLAlchemy",
-    weeks: 3,
-    state: "current",
-    summary: "Учимся хранить и доставать данные правильно. PostgreSQL + индексы + ORM, без которых не существует ни одного бэкенда.",
-    topics: [
-      { html: "SQL: <code>JOIN</code>, оконные функции, EXPLAIN ANALYZE" },
-      { html: "PostgreSQL: типы данных, индексы, транзакции, изоляция" },
-      { html: "SQLAlchemy 2.x: декларативный mapping, сессии, lazy/eager loading" },
-      { html: "Миграции через <code>Alembic</code>, версионирование схемы" },
-    ],
-    outcome: "Уверенно проектируешь схему БД и пишешь эффективные запросы — без N+1 и без боли при миграциях.",
-    courses: [
-      { plat: "stepik",    name: "Stepik",            title: "Интерактивный тренажёр по SQL", price: 0 },
-      { plat: "stepik",    name: "Stepik",            title: "PostgreSQL для разработчиков",   price: 1490 },
-      { plat: "practicum", name: "Яндекс Практикум",  title: "SQL для работы с данными",       price: 3990 },
-      { plat: "skillbox",  name: "Skillbox",          title: "Базы данных PostgreSQL",         price: 6900 },
-    ],
-    task: "Спроектируй схему БД для книжного магазина: таблицы <b>books</b>, <b>authors</b>, <b>orders</b>, <b>order_items</b>. Напиши SQL-запрос: топ-5 авторов по выручке за последний месяц с использованием JOIN и оконной функции.",
-  },
-  {
-    id: 3,
-    planet: "jupiter",
-    title: "FastAPI и продакшен-веб",
-    weeks: 4,
-    state: "locked",
-    summary: "Превращаем Python-навык в реальный сервис: async, Pydantic, dependency injection, OpenAPI и JWT-аутентификация.",
-    topics: [
-      { html: "<code>async</code> / <code>await</code>, цикл событий и асинхронные I/O" },
-      { html: "Pydantic v2: валидация, сериализация, кастомные типы" },
-      { html: "<code>Depends</code>, аутентификация, JWT, RBAC" },
-      { html: "OpenAPI, фоновые задачи, кэширование через Redis" },
-    ],
-    outcome: "Поднимаешь production-ready API: с авторизацией, документацией и понятной структурой роутов.",
-    courses: [
-      { plat: "stepik",    name: "Stepik",           title: "FastAPI: создание REST API",      price: 1990 },
-      { plat: "practicum", name: "Яндекс Практикум", title: "Бэкенд-разработчик на Python",    price: 8900 },
-      { plat: "gb",        name: "GeekBrains",       title: "FastAPI и асинхронный Python",    price: 5900 },
-    ],
-    task: "Спроектируй FastAPI-роут <b>POST /orders</b> с авторизацией через JWT и валидацией тела через Pydantic. Опиши, какие зависимости (<code>Depends</code>) ты используешь и какие коды ошибок возвращаешь.",
-  },
-  {
-    id: 4,
-    planet: "neptune",
-    rings: true,
-    title: "Тестирование и DevOps",
-    weeks: 3,
-    state: "locked",
-    summary: "Чтобы код жил долго, его надо тестировать и деплоить. pytest, фикстуры, Docker, CI — и пайплайн собирается сам.",
-    topics: [
-      { html: "<code>pytest</code>: фикстуры, параметризация, моки" },
-      { html: "Покрытие, контрактные тесты, E2E через <code>httpx</code>" },
-      { html: "<code>Docker</code>, multi-stage сборки, docker-compose" },
-      { html: "CI/CD в GitHub Actions: lint → test → build → deploy" },
-    ],
-    outcome: "Любой твой проект собирается одной командой и проходит CI прежде, чем попасть в main.",
-    courses: [
-      { plat: "stepik",    name: "Stepik",           title: "Тестирование Python-кода",        price: 990 },
-      { plat: "practicum", name: "Яндекс Практикум", title: "DevOps для бэкенда",              price: 6900 },
-      { plat: "hexlet",    name: "Hexlet",           title: "Docker и оркестрация контейнеров", price: 0 },
-    ],
-    task: "Напиши pytest-фикстуру, поднимающую тестовую PostgreSQL в Docker через <code>testcontainers</code>, и тест на эндпоинт <code>GET /orders/{id}</code>, проверяющий 200 и 404.",
-  },
-  {
-    id: 5,
-    planet: "star",
-    title: "Pet-проект для портфолио",
-    weeks: 4,
-    state: "locked",
-    final: true,
-    summary: "Собираем всё в один проект, который не стыдно показать на собеседовании: MVP, репозиторий, README, деплой.",
-    topics: [
-      { html: "Декомпозиция: backlog, MVP-скоуп, milestones" },
-      { html: "Архитектура: чистые слои, тесты, миграции" },
-      { html: "Деплой: VPS + Caddy / Yandex Cloud, мониторинг" },
-      { html: "Презентация: README, скриншоты, демо-видео" },
-    ],
-    outcome: "У тебя есть рабочий проект в портфолио и история к нему — что строил, какие выборы делал, какие компромиссы принимал.",
-    courses: [
-      { plat: "stepik",    name: "Stepik",           title: "Подготовка к собеседованиям Python", price: 1490 },
-      { plat: "practicum", name: "Яндекс Практикум", title: "Карьерный трек: бэкенд",            price: 4900 },
-    ],
-    task: "Сформулируй MVP-скоуп своего pet-проекта (3–5 фич), нарисуй ER-диаграмму БД и распиши план на 4 недели по неделям.",
-  },
-];
-
 window.PROGRESSORS_DATA = {
   FIXED_OPTIONS,
   QUESTIONS,
   LEVELS,
-  STAGES,
 };
 </script>
   <script type="text/babel">
@@ -2964,9 +2853,7 @@ function CompleteScreen({ state, stages, onRestart, onBack }) {
 
 function TrackScreen({ state, setState, onRestart }) {
   const { LEVELS } = window.PROGRESSORS_DATA;
-  const STAGES = (state.stages && state.stages.length > 0)
-    ? state.stages
-    : window.PROGRESSORS_DATA.STAGES;
+  const STAGES = state.stages || [];
   const lvl = LEVELS[state.level] || LEVELS["Средний уровень"];
 
   const firstId = STAGES.length > 0 ? STAGES[0].id : 1;
