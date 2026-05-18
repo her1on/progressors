@@ -1320,7 +1320,177 @@ a { color: inherit; text-decoration: none; }
 
   .btn { padding: 10px 16px; font-size: 14px; }
   .stage-detail-head { padding: 18px 18px; }
+
+  .landing-title { font-size: 44px; }
+  .landing-features { grid-template-columns: 1fr; }
+  .landing { padding: 40px 20px 60px; }
+  .complete-screen { padding: 40px 20px 60px; }
+  .complete-stat { min-width: 90px; padding: 12px 16px; }
+  .complete-title { font-size: 28px; }
 }
+
+/* ─── landing screen ───────────────────────────────────────────────── */
+.landing {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 60px 40px 100px;
+  text-align: center;
+}
+.landing-orb {
+  width: 80px; height: 80px;
+  border-radius: 50%;
+  background: var(--grad-aurora);
+  margin: 0 auto 36px;
+  box-shadow: 0 0 60px rgba(139,109,255,0.55), 0 0 120px rgba(92,199,255,0.25);
+  animation: spin 10s linear infinite;
+  position: relative;
+}
+.landing-orb::after {
+  content: "";
+  position: absolute;
+  inset: 14px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 30% 30%, rgba(255,255,255,0.85), transparent 60%);
+  mix-blend-mode: screen;
+}
+.landing-title {
+  font-family: var(--ff-display);
+  font-weight: 700;
+  font-size: 76px;
+  line-height: 1.0;
+  letter-spacing: -0.03em;
+  margin: 0 0 20px;
+}
+.landing-sub {
+  font-size: 19px;
+  color: var(--fg-soft);
+  max-width: 50ch;
+  line-height: 1.55;
+  margin: 0 auto 52px;
+}
+.landing-features {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+  max-width: 860px;
+  width: 100%;
+  margin: 0 auto 52px;
+  text-align: left;
+}
+.landing-feature {
+  background: var(--surf-1);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-md);
+  padding: 26px 22px;
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+}
+.landing-feature-icon { font-size: 30px; margin-bottom: 14px; display: block; }
+.landing-feature h3 {
+  font-family: var(--ff-display);
+  font-size: 16px;
+  font-weight: 600;
+  margin: 0 0 8px;
+}
+.landing-feature p {
+  font-size: 14px;
+  color: var(--fg-soft);
+  line-height: 1.5;
+  margin: 0;
+}
+
+/* ─── complete screen ──────────────────────────────────────────────── */
+.complete-screen {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 60px 40px 80px;
+  text-align: center;
+}
+.complete-star-wrap {
+  position: relative;
+  width: 120px;
+  height: 120px;
+  margin: 0 auto 44px;
+}
+.complete-star-orb {
+  width: 120px; height: 120px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 35%, #fff8e0, #f5c067 55%, #e6a817);
+  box-shadow: 0 0 40px rgba(245,192,103,0.8), 0 0 80px rgba(245,192,103,0.45), 0 0 120px rgba(245,192,103,0.2);
+  animation: complete-pulse 2.5s ease-in-out infinite;
+  position: relative;
+  z-index: 1;
+}
+.complete-corona-ring {
+  position: absolute;
+  inset: -20px;
+  border-radius: 50%;
+  border: 1.5px solid rgba(245,192,103,0.3);
+  animation: complete-expand 2.8s ease-out infinite;
+}
+.complete-corona-ring:nth-child(2) {
+  inset: -40px;
+  border-color: rgba(245,192,103,0.15);
+  animation-delay: 0.5s;
+}
+@keyframes complete-pulse {
+  0%, 100% { box-shadow: 0 0 40px rgba(245,192,103,0.8), 0 0 80px rgba(245,192,103,0.45), 0 0 120px rgba(245,192,103,0.2); }
+  50%       { box-shadow: 0 0 60px rgba(245,192,103,1),   0 0 120px rgba(245,192,103,0.65), 0 0 180px rgba(245,192,103,0.3); }
+}
+@keyframes complete-expand {
+  0%   { transform: scale(1);   opacity: 1; }
+  100% { transform: scale(1.7); opacity: 0; }
+}
+.complete-title {
+  font-family: var(--ff-display);
+  font-size: 42px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  margin: 0 0 14px;
+}
+.complete-sub {
+  font-size: 17px;
+  color: var(--fg-soft);
+  line-height: 1.55;
+  max-width: 46ch;
+  margin: 0 auto 44px;
+}
+.complete-stats {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  justify-content: center;
+  margin-bottom: 48px;
+}
+.complete-stat {
+  background: var(--surf-1);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-md);
+  padding: 18px 26px;
+  min-width: 110px;
+  backdrop-filter: blur(14px);
+}
+.complete-stat-val {
+  font-family: var(--ff-display);
+  font-size: 30px;
+  font-weight: 700;
+  color: var(--acc-3);
+  line-height: 1;
+  margin-bottom: 6px;
+}
+.complete-stat-label {
+  font-family: var(--ff-mono);
+  font-size: 11px;
+  color: var(--fg-mute);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+.complete-actions { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; }
 
   </style>
 </head>
@@ -2052,6 +2222,7 @@ function Topbar({ step, level, onRestart }) {
         <div className="brand-tag">ai · навигатор по обучению</div>
       </div>
       <div className="topbar-right">
+        {step === "landing" && <span><span className="dot" /> старт маршрута</span>}
         {step === "input"   && <span><span className="dot" /> сессия / 01 ввод цели</span>}
         {step === "quiz"    && <span><span className="dot" /> сессия / 02 диагностика</span>}
         {step === "reveal"  && <span><span className="dot" /> сессия / 03 уровень определён</span>}
@@ -2113,6 +2284,44 @@ function Segmented({ options, value, onChange }) {
 }
 
 Object.assign(window, { Topbar, Cosmos, CosmicSlider, Segmented });
+</script>
+  <script type="text/babel">/* global React */
+// ─── Landing screen ─────────────────────────────────────────────────
+function LandingScreen({ onStart }) {
+  return (
+    <div className="landing">
+      <div className="landing-orb" />
+      <div className="eyebrow" style={{ marginBottom: 18 }}>ИИ-навигатор по обучению</div>
+      <h1 className="landing-title">
+        <span className="aurora-text">Прогрессоры</span>
+      </h1>
+      <p className="landing-sub">
+        Скажи, чему хочешь научиться. Мы проведём диагностику, построим персональный трек и подберём реальные курсы — за несколько минут.
+      </p>
+      <div className="landing-features">
+        <div className="landing-feature">
+          <span className="landing-feature-icon">🔭</span>
+          <h3>Диагностика за 4 вопроса</h3>
+          <p>ИИ определит твой текущий уровень — от Новичка до Продвинутого — и учтёт его при составлении трека.</p>
+        </div>
+        <div className="landing-feature">
+          <span className="landing-feature-icon">🪐</span>
+          <h3>Созвездие навыков</h3>
+          <p>Персональный трек из этапов-планет с конкретными темами, результатами и практическими заданиями.</p>
+        </div>
+        <div className="landing-feature">
+          <span className="landing-feature-icon">📡</span>
+          <h3>Реальные курсы</h3>
+          <p>Stepik, Яндекс Практикум, Skillbox — только то, что доступно в России без VPN, в рамках твоего бюджета.</p>
+        </div>
+      </div>
+      <button className="btn btn-primary" style={{ fontSize: 17, padding: "16px 40px" }} onClick={onStart}>
+        Начать маршрут →
+      </button>
+    </div>
+  );
+}
+Object.assign(window, { LandingScreen });
 </script>
   <script type="text/babel">/* global React, CosmicSlider, Segmented */
 const { useState: useStateS, useEffect: useEffectS, useMemo: useMemoS, useRef: useRefS } = React;
@@ -2683,7 +2892,52 @@ function StageDetail({ stage, goal, level, isLocked, completed, onComplete, onUn
 }
 
 // ─── Track wrapper ─────────────────────────────────────────────────────
-function TrackScreen({ state, setState }) {
+// ─── Complete screen ─────────────────────────────────────────────────
+function CompleteScreen({ state, stages, onRestart, onBack }) {
+  const { LEVELS } = window.PROGRESSORS_DATA;
+  const lvl = LEVELS[state.level] || LEVELS["Средний уровень"];
+  const totalWeeks = stages.reduce((sum, s) => sum + (s.weeks || 0), 0);
+  return (
+    <div className="complete-screen">
+      <div className="complete-star-wrap">
+        <div className="complete-corona-ring" />
+        <div className="complete-corona-ring" />
+        <div className="complete-star-orb" />
+      </div>
+      <div className="eyebrow" style={{ marginBottom: 16 }}>маршрут завершён</div>
+      <h2 className="complete-title">
+        <span className="aurora-text">Ты долетел!</span>
+      </h2>
+      <p className="complete-sub">
+        Весь путь по созвездию «{state.goal}» пройден. Это настоящий прогресс — двигайся дальше.
+      </p>
+      <div className="complete-stats">
+        <div className="complete-stat">
+          <div className="complete-stat-val">{stages.length}</div>
+          <div className="complete-stat-label">этапов</div>
+        </div>
+        <div className="complete-stat">
+          <div className="complete-stat-val">{totalWeeks}</div>
+          <div className="complete-stat-label">недель</div>
+        </div>
+        <div className="complete-stat">
+          <div className="complete-stat-val">{state.hours}</div>
+          <div className="complete-stat-label">ч / нед</div>
+        </div>
+        <div className="complete-stat">
+          <div className="complete-stat-val" style={{ fontSize: 20, paddingTop: 5 }}>★ {lvl.short}</div>
+          <div className="complete-stat-label">уровень</div>
+        </div>
+      </div>
+      <div className="complete-actions">
+        <button className="btn btn-ghost" onClick={onBack}>← Вернуться к треку</button>
+        <button className="btn btn-primary" onClick={onRestart}>Начать новый маршрут</button>
+      </div>
+    </div>
+  );
+}
+
+function TrackScreen({ state, setState, onRestart }) {
   const { LEVELS } = window.PROGRESSORS_DATA;
   const STAGES = (state.stages && state.stages.length > 0)
     ? state.stages
@@ -2691,10 +2945,17 @@ function TrackScreen({ state, setState }) {
   const lvl = LEVELS[state.level] || LEVELS["Средний уровень"];
 
   const firstId = STAGES.length > 0 ? STAGES[0].id : 1;
-  const [activeId, setActiveId] = useStateT(firstId);
-  const [completed, setCompleted] = useStateT([]);
-  const [unlocked, setUnlocked]   = useStateT([firstId]);
-  const [toast, setToast]         = useStateT(null);
+  const [activeId, setActiveId]     = useStateT(firstId);
+  const [completed, setCompleted]   = useStateT([]);
+  const [unlocked, setUnlocked]     = useStateT([firstId]);
+  const [toast, setToast]           = useStateT(null);
+  const [showComplete, setShowComplete] = useStateT(false);
+
+  useEffectT(() => {
+    if (STAGES.length > 0 && completed.length === STAGES.length) {
+      setShowComplete(true);
+    }
+  }, [completed]);
 
   const activeStage = useMemoT(() => STAGES.find((s) => s.id === activeId) || STAGES[0], [activeId]);
 
@@ -2744,6 +3005,19 @@ function TrackScreen({ state, setState }) {
       setTimeout(() => setToast(null), 3000);
     }
   };
+
+  if (showComplete) {
+    return (
+      <div className="track">
+        <CompleteScreen
+          state={state}
+          stages={STAGES}
+          onRestart={onRestart}
+          onBack={() => setShowComplete(false)}
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="track">
@@ -2847,7 +3121,7 @@ function TrackScreen({ state, setState }) {
 
 Object.assign(window, { TrackScreen });
 </script>
-  <script type="text/babel">/* global React, ReactDOM, Cosmos, Topbar, InputScreen, QuizScreen, RevealScreen, TrackScreen,
+  <script type="text/babel">/* global React, ReactDOM, Cosmos, Topbar, LandingScreen, InputScreen, QuizScreen, RevealScreen, TrackScreen,
    TweaksPanel, useTweaks, TweakSection, TweakRadio, TweakColor, TweakToggle, TweakSlider */
 const { useState, useEffect, useMemo } = React;
 
@@ -2895,8 +3169,8 @@ function App() {
     return s;
   })();
 
-  // step machine
-  const [step, setStep] = useState(saved?.step || "input");
+  // step machine — landing only shown on first visit (no saved session)
+  const [step, setStep] = useState(saved?.step || "landing");
   const [loading, setLoading] = useState(false);
   const [loadingMsg, setLoadingMsg] = useState("");
   const [error, setError] = useState("");
@@ -3080,13 +3354,17 @@ function App() {
       )}
 
       <div className="app" data-screen-label={
-        step === "input"  ? "01 Ввод цели" :
-        step === "quiz"   ? "02 Диагностика" :
-        step === "reveal" ? "03 Уровень" :
-                            "04 Трек"
+        step === "landing" ? "00 Старт" :
+        step === "input"   ? "01 Ввод цели" :
+        step === "quiz"    ? "02 Диагностика" :
+        step === "reveal"  ? "03 Уровень" :
+                             "04 Трек"
       }>
         <Topbar step={step} level={state.level} onRestart={reset} />
 
+        {step === "landing" && (
+          <LandingScreen onStart={() => { setStep("input"); window.scrollTo({ top: 0, behavior: "smooth" }); }} />
+        )}
         {step === "input" && (
           <InputScreen
             state={state}
@@ -3113,7 +3391,7 @@ function App() {
           />
         )}
         {step === "track" && (
-          <TrackScreen state={state} setState={setState} />
+          <TrackScreen state={state} setState={setState} onRestart={reset} />
         )}
       </div>
 
@@ -3158,10 +3436,11 @@ function App() {
         <TweakSection title="Демо-навигация">
           <div style={{ display: "grid", gap: 8 }}>
             {[
-              ["input",  "01 · Ввод цели"],
-              ["quiz",   "02 · Диагностика"],
-              ["reveal", "03 · Уровень"],
-              ["track",  "04 · Трек"],
+              ["landing", "00 · Лендинг"],
+              ["input",   "01 · Ввод цели"],
+              ["quiz",    "02 · Диагностика"],
+              ["reveal",  "03 · Уровень"],
+              ["track",   "04 · Трек"],
             ].map(([k, label]) => (
               <button
                 key={k}
