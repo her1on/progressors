@@ -65,17 +65,27 @@ class FeedbackRequest(BaseModel):
 
 # ── Track parser ─────────────────────────────────────────────────────────────
 
+_REFUSAL_MARKERS = [
+    "Пожалуйста, укажи конкретный навык",
+    "не могу составить трек",
+    "не буду составлять",
+]
+
+
 def parse_track_to_stages(track_text: str) -> list:
+    # Strip markdown code fences GigaChat sometimes wraps the response in
+    track_text = re.sub(r"```[a-z]*\n?", "", track_text).strip()
+
     stages = []
     parts = re.split(r"\n(?=##\s)", "\n" + track_text.strip())
 
     for part in parts:
-        if not re.match(r"##[^\n]*Этап\s*\d+", part):
+        if not re.match(r"##[^\n]*(?:Этап|Шаг)\s*\d+", part):
             continue
 
         idx = len(stages)
 
-        title_match = re.match(r"##[^\n]*Этап\s*\d+:\s*(.+)", part)
+        title_match = re.match(r"##[^\n]*(?:Этап|Шаг)\s*\d+[:.]\s*(.+)", part)
         title = title_match.group(1).strip() if title_match else f"Этап {idx + 1}"
 
         weeks_match = re.search(r"\*\*Длительность:\*\*\s*(\d+)", part)
@@ -300,6 +310,9 @@ Skillbox | Python-разработчик с нуля
         raise HTTPException(500, "Не удалось сгенерировать трек. Попробуй ещё раз.")
 
     track_text = track_result
+    if any(m in track_text for m in _REFUSAL_MARKERS):
+        raise HTTPException(422, track_text.split("\n")[0])
+
     stepik_raw = [] if isinstance(stepik_result, Exception) else stepik_result
     plat_raw = "" if isinstance(plat_result, Exception) else plat_result
 
@@ -328,6 +341,13 @@ Skillbox | Python-разработчик с нуля
                 break
 
     stages = parse_track_to_stages(track_text)
+
+    if not stages:
+        try:
+            track_text = await asyncio.to_thread(call_gigachat, prompt)
+            stages = parse_track_to_stages(track_text)
+        except Exception:
+            pass
 
     if not stages:
         raise HTTPException(500, "Не удалось распарсить трек. Попробуй ещё раз.")
