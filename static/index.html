@@ -3150,7 +3150,7 @@ function App() {
         body: JSON.stringify({ goal: state.goal }),
       });
       const validate = await vRes.json();
-      if (validate.status === "abstract" || validate.status === "unrealistic") {
+      if (validate.status === "invalid" || validate.status === "abstract" || validate.status === "unrealistic") {
         setError(validate.message || "Уточни цель.");
         setLoading(false);
         return;
