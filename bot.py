@@ -430,8 +430,10 @@ async def build_track(callback: CallbackQuery, state: FSMContext):
 
     try:
         track_text = await asyncio.to_thread(call_gigachat, prompt)
+        logger.info(f"Track raw response (first 300): {track_text[:300]}")
         stages = parse_track(track_text)
         if not stages:
+            logger.error(f"parse_track returned empty. Full response:\n{track_text}")
             raise ValueError("no stages")
     except Exception as e:
         logger.error(f"Track generation failed: {e}")
