@@ -1,4 +1,5 @@
 import asyncio
+import json
 import logging
 import os
 import re
@@ -30,6 +31,7 @@ from bot_prompts import (
     alternative_prompt,
     questions_prompt,
     simplify_prompt,
+    specialize_prompt,
     track_prompt,
     validate_prompt,
 )
@@ -94,6 +96,16 @@ async def _fetch_questions(goal: str) -> list[dict]:
     ]
 
 
+async def _fetch_specializations(goal: str) -> list[str]:
+    try:
+        raw = await asyncio.to_thread(call_llm, specialize_prompt(goal))
+        data = json.loads(raw.strip())
+        return [item["option"] for item in data if "option" in item][:3]
+    except Exception as e:
+        logger.warning(f"_fetch_specializations failed for goal={goal!r}: {e}")
+        return []
+
+
 async def _validate_goal(goal: str) -> tuple[str, str, str]:
     """Возвращает (status, explanation, scope). status: ok | abstract | institutional | unrealistic. scope: узкий | широкий."""
     try:
@@ -130,6 +142,7 @@ async def _fetch_track(prompt: str) -> tuple[list[dict], str]:
 
 class Form(StatesGroup):
     goal = State()
+    specialization = State()
     hours = State()
     months = State()
     motivation = State()
@@ -226,6 +239,19 @@ def kb_restart():
     return InlineKeyboardMarkup(inline_keyboard=[[
         InlineKeyboardButton(text="🔄 Начать новый маршрут", callback_data="restart"),
     ]])
+
+
+def kb_specialization(options: list[str]) -> InlineKeyboardMarkup:
+    rows = [[InlineKeyboardButton(text=opt, callback_data=f"spec_{i}")] for i, opt in enumerate(options)]
+    rows.append([InlineKeyboardButton(text="Общее направление", callback_data="spec_none")])
+    return InlineKeyboardMarkup(inline_keyboard=rows)
+
+
+def kb_time_warning() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="Всё равно продолжить", callback_data="time_ok")],
+        [InlineKeyboardButton(text="✏️ Изменить время", callback_data="time_change")],
+    ])
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -434,6 +460,7 @@ async def cmd_help(message: Message):
         "4. Получи персональный трек с бесплатными материалами\n\n"
         "*Команды:*\n"
         "/start — начать или перезапустить\n"
+        "/progress — прогресс по текущему треку\n"
         "/cancel — отменить текущий процесс\n"
         "/help — эта справка\n\n"
         "*На каждом этапе трека можно:*\n"
@@ -449,6 +476,36 @@ async def cmd_help(message: Message):
 @dp.message(F.text.in_({"🚀 Новый маршрут", "Новый маршрут"}))
 async def menu_new_route(message: Message, state: FSMContext):
     await cmd_start(message, state)
+
+
+@dp.message(Command("progress"))
+async def cmd_progress(message: Message, state: FSMContext):
+    data = await state.get_data()
+    stages = data.get("stages")
+    if not stages:
+        await message.answer("У тебя пока нет активного трека. Начни с /start")
+        return
+
+    goal = data.get("goal", "")
+    level = data.get("level", "")
+    completed = data.get("completed", [])
+    total = len(stages)
+    done = len(completed)
+    current = min(data.get("current_stage", 0), total - 1)
+
+    bar = " ".join(
+        "✅" if i in completed else ("▶️" if i == current else "⬜")
+        for i in range(total)
+    )
+
+    await message.answer(
+        f"*Твой прогресс*\n\n"
+        f"*Цель:* {escape_md(goal)}\n"
+        f"*Уровень:* {level}\n\n"
+        f"{bar}\n"
+        f"Пройдено: {done} из {total} этапов\n\n"
+        f"Сейчас: Этап {current + 1} — _{escape_md(stages[current]['title'])}_"
+    )
 
 
 @dp.message(Command("cancel"))
@@ -500,13 +557,60 @@ async def got_goal(message: Message, state: FSMContext):
         )
         return
 
-    # Запускаем генерацию вопросов фоново, пока пользователь выбирает часы и месяцы
+    await state.update_data(goal=goal, goal_scope=scope)
+
+    if scope == "широкий":
+        stop = asyncio.Event()
+        typing_task = asyncio.create_task(_typing_loop(message.chat.id, stop))
+        try:
+            spec_options = await _fetch_specializations(goal)
+        finally:
+            stop.set()
+            typing_task.cancel()
+
+        if spec_options:
+            await state.update_data(spec_options=spec_options)
+            await message.answer(
+                f"Отлично! Цель: *{escape_md(goal)}*\n\nУточни направление:",
+                reply_markup=kb_specialization(spec_options),
+            )
+            await state.set_state(Form.specialization)
+            return
+
+    # Узкая цель или не удалось получить специализации — сразу к часам
     questions_task = asyncio.create_task(_fetch_questions(goal))
     _questions_tasks[message.from_user.id] = questions_task
-    await state.update_data(goal=goal, goal_scope=scope)
 
     await message.answer(
         f"Отлично! Цель: *{escape_md(goal)}*\n\nСколько часов в неделю готов уделять учёбе?",
+        reply_markup=kb_hours(),
+    )
+    await state.set_state(Form.hours)
+
+
+@dp.callback_query(Form.specialization, F.data.startswith("spec_"))
+async def got_specialization(callback: CallbackQuery, state: FSMContext):
+    await callback.answer()
+    try:
+        await callback.message.delete()
+    except Exception:
+        pass
+
+    data = await state.get_data()
+    goal = data["goal"]
+
+    if callback.data != "spec_none":
+        idx = int(callback.data.split("_")[1])
+        options = data.get("spec_options", [])
+        if idx < len(options):
+            goal = f"{goal} — {options[idx]}"
+            await state.update_data(goal=goal)
+
+    questions_task = asyncio.create_task(_fetch_questions(goal))
+    _questions_tasks[callback.from_user.id] = questions_task
+
+    await callback.message.answer(
+        f"Цель: *{escape_md(goal)}*\n\nСколько часов в неделю готов уделять учёбе?",
         reply_markup=kb_hours(),
     )
     await state.set_state(Form.hours)
@@ -542,6 +646,18 @@ FORMAT_LABELS = {
 }
 
 
+async def _proceed_after_months(callback: CallbackQuery, state: FSMContext, data: dict) -> None:
+    if data.get("goal_scope") == "узкий":
+        await state.update_data(motivation="Личное обучение", format_pref="Любой формат")
+        await _resolve_questions_and_start_quiz(callback, state)
+    else:
+        await callback.message.answer(
+            "*Что движет тобой?* Это поможет подобрать материалы точнее.",
+            reply_markup=kb_motivation(),
+        )
+        await state.set_state(Form.motivation)
+
+
 @dp.callback_query(Form.months, F.data.startswith("m_"))
 async def got_months(callback: CallbackQuery, state: FSMContext):
     months = int(callback.data.split("_")[1])
@@ -553,15 +669,42 @@ async def got_months(callback: CallbackQuery, state: FSMContext):
     except Exception:
         pass
 
-    if data.get("goal_scope") == "узкий":
-        await state.update_data(motivation="Личное обучение", format_pref="Любой формат")
-        await _resolve_questions_and_start_quiz(callback, state)
-    else:
+    hours = data["hours"]
+    weeks = months * 4
+    if data.get("goal_scope") != "узкий" and hours * weeks < 20:
         await callback.message.answer(
-            "*Что движет тобой?* Это поможет подобрать материалы точнее.",
-            reply_markup=kb_motivation(),
+            f"⚠️ *{hours} ч/нед × {months} мес = {hours * weeks} ч* — это немного для твоей цели.\n\n"
+            f"Рекомендуем минимум 20 ч суммарно для ощутимого прогресса. Продолжить или пересмотреть?",
+            reply_markup=kb_time_warning(),
         )
-        await state.set_state(Form.motivation)
+        return
+
+    await _proceed_after_months(callback, state, data)
+
+
+@dp.callback_query(Form.months, F.data == "time_ok")
+async def time_warning_ok(callback: CallbackQuery, state: FSMContext):
+    data = await state.get_data()
+    await callback.answer()
+    try:
+        await callback.message.delete()
+    except Exception:
+        pass
+    await _proceed_after_months(callback, state, data)
+
+
+@dp.callback_query(Form.months, F.data == "time_change")
+async def time_warning_change(callback: CallbackQuery, state: FSMContext):
+    await callback.answer()
+    try:
+        await callback.message.delete()
+    except Exception:
+        pass
+    await callback.message.answer(
+        "Сколько часов в неделю готов уделять учёбе?",
+        reply_markup=kb_hours(),
+    )
+    await state.set_state(Form.hours)
 
 
 @dp.callback_query(Form.motivation, F.data.startswith("mot_"))
@@ -1014,6 +1157,7 @@ async def on_startup(bot: Bot) -> None:
     logger.info(f"Webhook registered: {webhook_url}")
     await bot.set_my_commands([
         BotCommand(command="start", description="Начать / перезапустить"),
+        BotCommand(command="progress", description="Мой прогресс по треку"),
         BotCommand(command="cancel", description="Отменить текущий процесс"),
         BotCommand(command="help", description="Справка"),
     ])
