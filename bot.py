@@ -240,34 +240,19 @@ _SOURCE_SEARCH = {
 
 def linkify_materials(text: str) -> str:
     """Превращает [YouTube] Название — Канал в кликабельную ссылку на поиск."""
-    def make_link(source: str, title: str) -> str:
+    def replace(m: re.Match) -> str:
+        source = m.group(1).strip()
+        rest = m.group(2).strip()
+        title = rest.split(" — ")[0].strip()
         title = re.sub(r"\s*\([^)]*\)\s*$", "", title).strip()
-        title = title.strip('"\'*')
+        title = re.sub(r"[\[\]\*\"\']+", "", title).strip()
         base = _SOURCE_SEARCH.get(source.lower())
-        if not base or not title:
-            return None
+        if not base or not title or source.lower() == "stepik":
+            return m.group(0)
         url = base.format(urllib.parse.quote_plus(title))
         return f"[{source}: {title}]({url})"
 
-    def replace_bracket(m: re.Match) -> str:
-        source = m.group(1).strip()
-        rest = m.group(2).strip().split(" — ")[0].strip()
-        link = make_link(source, rest)
-        return link if link else m.group(0)
-
-    def replace_colon(m: re.Match) -> str:
-        source = m.group(1).strip()
-        rest = re.sub(r"\*+", "", m.group(2)).strip().split(" — ")[0].strip()
-        rest = rest.strip('"\'')
-        link = make_link(source, rest)
-        return link if link else m.group(0)
-
-    # Формат [Source] Name
-    text = re.sub(r"\[([^\]\n]+)\]\s+([^\n]+)", replace_bracket, text)
-    # Формат Source: **"Name"** (запасной вариант если модель нарушила формат)
-    sources = "|".join(re.escape(k.title()) for k in _SOURCE_SEARCH)
-    text = re.sub(rf"({sources}):\s+(\*{{0,2}}[^\n]+)", replace_colon, text)
-    return text
+    return re.sub(r"\[([^\]\n]+)\]\s+([^\n]+)", replace, text)
 
 
 def calc_level(answers: list[str]) -> str:
@@ -714,25 +699,25 @@ async def _send_stage(message: Message, state: FSMContext, idx: int):
     text = await _resolve_stepik_links(format_stage(stage, idx, len(stages)))
 
     try:
-        courses = await asyncio.to_thread(search_stepik_courses, stage["title"], 0, 3)
-        if courses:
-            lines = ["\n📚 *Курсы на Stepik:*"]
-            for c in courses:
-                price_text = "бесплатно" if c["price"] == 0 else f"{c['price']} ₽"
-                lines.append(f"• [{escape_md(c['title'])}]({c['url']}) — {price_text}")
-            text = (text + "\n".join(lines))[:4000]
-    except Exception:
-        pass
-
-    try:
-        await message.answer(text, reply_markup=kb_stage(idx, is_last))
+        await message.answer(text[:4000], reply_markup=kb_stage(idx, is_last))
     except Exception as e:
         logger.warning(f"Markdown send failed for stage {idx}, retrying as plain text: {e}")
         await message.answer(
-            re.sub(r"[*_`\[\]]", "", text),
+            re.sub(r"[*_`\[\]]", "", text[:4000]),
             parse_mode=None,
             reply_markup=kb_stage(idx, is_last),
         )
+
+    try:
+        courses = await asyncio.to_thread(search_stepik_courses, stage["title"], 0, 3)
+        if courses:
+            lines = ["📚 *Курсы на Stepik по этому этапу:*\n"]
+            for c in courses:
+                price_text = "бесплатно" if c["price"] == 0 else f"{c['price']} ₽"
+                lines.append(f"• [{c['title']}]({c['url']}) — {price_text}")
+            await message.answer("\n".join(lines))
+    except Exception:
+        pass
 
 
 @dp.callback_query(Form.track, F.data.startswith("done_"))
