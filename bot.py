@@ -381,13 +381,15 @@ async def got_months(callback: CallbackQuery, state: FSMContext):
     user_id = callback.from_user.id
     task = _questions_tasks.pop(user_id, None)
 
-    if task and task.done():
+    if task and task.done() and not task.exception():
         questions = task.result()
     else:
+        if task:
+            task.cancel()
         stop = asyncio.Event()
         typing_task = asyncio.create_task(_typing_loop(callback.message.chat.id, stop))
         try:
-            questions = await (task if task else _fetch_questions(data["goal"]))
+            questions = await _fetch_questions(data["goal"])
         finally:
             stop.set()
             typing_task.cancel()
