@@ -78,8 +78,9 @@ async def _fetch_questions(goal: str) -> list[dict]:
         questions = parse_questions(raw)
         if questions:
             return questions
-    except Exception:
-        pass
+        logger.warning(f"parse_questions returned empty for goal='{goal}', raw={raw[:200]!r}")
+    except Exception as e:
+        logger.error(f"_fetch_questions failed for goal='{goal}': {e}")
     return [
         {"question": f"Насколько ты знаком с основами темы «{goal}»?"},
         {"question": f"Как часто ты практикуешь навыки по теме «{goal}»?"},
