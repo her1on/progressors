@@ -2,6 +2,7 @@ import asyncio
 import logging
 import os
 import re
+import urllib.parse
 
 from aiogram import Bot, Dispatcher, F
 from aiogram.client.default import DefaultBotProperties
@@ -182,6 +183,35 @@ def escape_md(text: str) -> str:
     return text
 
 
+_SOURCE_SEARCH = {
+    "youtube":  "https://www.youtube.com/results?search_query={}",
+    "stepik":   "https://stepik.org/search?query={}",
+    "habr":     "https://habr.com/ru/search/?q={}",
+    "rutube":   "https://rutube.ru/search/?query={}",
+    "github":   "https://github.com/search?q={}",
+    "vk":       "https://vk.com/video?q={}",
+    "vk видео": "https://vk.com/video?q={}",
+}
+
+
+def linkify_materials(text: str) -> str:
+    """Превращает [YouTube] Название — Канал в кликабельную ссылку на поиск."""
+    def replace(m: re.Match) -> str:
+        source = m.group(1).strip()
+        rest   = m.group(2).strip()
+        # Берём только название до " — " (убираем имя канала)
+        title = rest.split(" — ")[0].strip()
+        # Убираем пометки вроде (бесплатно)
+        title = re.sub(r"\s*\([^)]*\)\s*$", "", title).strip()
+        base = _SOURCE_SEARCH.get(source.lower())
+        if not base or not title:
+            return m.group(0)
+        url = base.format(urllib.parse.quote_plus(title))
+        return f"[{source}: {title}]({url})"
+
+    return re.sub(r"\[([^\]\n]+)\]\s+([^\n]+)", replace, text)
+
+
 def calc_level(answers: list[str]) -> str:
     score = sum("ABCD".index(a) for a in answers)
     if score <= 3:
@@ -270,7 +300,7 @@ def format_stage(stage: dict, idx: int, total: int) -> str:
     if stage.get("topics"):
         text += f"*Что изучать:*\n{stage['topics']}\n\n"
     if stage.get("materials"):
-        text += f"*Материалы:*\n{stage['materials']}\n\n"
+        text += f"*Материалы:*\n{linkify_materials(stage['materials'])}\n\n"
     if stage.get("outcome"):
         text += f"✨ *Результат:* _{stage['outcome']}_"
     return text[:4000]
