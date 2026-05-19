@@ -659,7 +659,6 @@ async def build_track(callback: CallbackQuery, state: FSMContext):
 
     await state.update_data(stages=stages, current_stage=0, completed=[])
     await state.set_state(Form.track)
-    await callback.answer()
     await _send_stage(callback.message, state, 0)
 
 
