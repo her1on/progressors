@@ -664,17 +664,14 @@ async def build_track(callback: CallbackQuery, state: FSMContext):
 
 async def _resolve_stepik_links(text: str) -> str:
     """Заменяет поисковые ссылки Stepik на прямые URL через API."""
-    stepik_pattern = re.compile(r"\[Stepik: ([^\]]+)\]\(https://stepik\.org/search\?query=[^)]+\)")
-    matches = stepik_pattern.findall(text)
-    if not matches:
-        return text
-    for title in matches:
+    stepik_pattern = re.compile(r"\[Stepik: ([^\]]+)\]\((https://stepik\.org/search\?query=[^)]+)\)")
+    for title, search_url in stepik_pattern.findall(text):
         try:
-            courses = await asyncio.to_thread(search_stepik_courses, title, 0, 1)
+            # budget=999999 — ищем любой курс, не фильтруем по цене
+            courses = await asyncio.to_thread(search_stepik_courses, title, 999999, 1)
             if courses:
                 direct_url = courses[0]["url"]
-                old = f"(https://stepik.org/search?query={urllib.parse.quote_plus(title)})"
-                text = text.replace(old, f"({direct_url})")
+                text = text.replace(search_url, direct_url)
         except Exception:
             pass
     return text
