@@ -55,8 +55,19 @@ QUIZ_OPTIONS = [
     ("D", "Занимаюсь на продвинутом уровне"),
 ]
 
-# Хранилище фоновых задач генерации вопросов (user_id → asyncio.Task)
+# Хранилище фоновых задач (user_id → asyncio.Task)
 _questions_tasks: dict[int, asyncio.Task] = {}
+_track_tasks: dict[int, asyncio.Task] = {}
+
+
+async def _typing_loop(chat_id: int, stop: asyncio.Event) -> None:
+    """Показывает индикатор «печатает...» каждые 4 сек пока не выставлен stop."""
+    while not stop.is_set():
+        try:
+            await bot.send_chat_action(chat_id=chat_id, action="typing")
+        except Exception:
+            pass
+        await asyncio.sleep(4)
 
 
 async def _fetch_questions(goal: str) -> list[dict]:
@@ -73,6 +84,16 @@ async def _fetch_questions(goal: str) -> list[dict]:
         {"question": f"В какой мере ты применял «{goal}» на практике?"},
         {"question": f"Насколько ты знаком с продвинутыми аспектами «{goal}»?"},
     ]
+
+
+async def _fetch_track(prompt: str) -> list[dict]:
+    track_text = await asyncio.to_thread(call_gigachat, prompt)
+    logger.info(f"Track raw response (first 300): {track_text[:300]}")
+    stages = parse_track(track_text)
+    if not stages:
+        logger.error(f"parse_track returned empty. Full response:\n{track_text}")
+        raise ValueError("no stages")
+    return stages
 
 
 # ── FSM States ────────────────────────────────────────────────────────────────
@@ -260,6 +281,7 @@ def format_stage(stage: dict, idx: int, total: int) -> str:
 @dp.message(CommandStart())
 async def cmd_start(message: Message, state: FSMContext):
     _questions_tasks.pop(message.from_user.id, None)
+    _track_tasks.pop(message.from_user.id, None)
     await state.clear()
     await message.answer(
         "🪐 *Прогрессоры* — твой ИИ-навигатор по обучению\n\n"
@@ -307,6 +329,7 @@ async def cmd_cancel(message: Message, state: FSMContext):
         await message.answer("Нечего отменять. Введи /start чтобы начать.")
         return
     _questions_tasks.pop(message.from_user.id, None)
+    _track_tasks.pop(message.from_user.id, None)
     await state.clear()
     await message.answer(
         "❌ Сброшено. Введи /start чтобы начать заново.",
@@ -358,17 +381,16 @@ async def got_months(callback: CallbackQuery, state: FSMContext):
     user_id = callback.from_user.id
     task = _questions_tasks.pop(user_id, None)
 
-    if task and not task.done():
-        msg = await callback.message.answer("⏳ Готовлю вопросы для диагностики...")
-        questions = await task
-        await msg.delete()
-    elif task and task.done():
+    if task and task.done():
         questions = task.result()
     else:
-        # Задача не найдена — генерируем синхронно
-        msg = await callback.message.answer("⏳ Готовлю вопросы для диагностики...")
-        questions = await _fetch_questions(data["goal"])
-        await msg.delete()
+        stop = asyncio.Event()
+        typing_task = asyncio.create_task(_typing_loop(callback.message.chat.id, stop))
+        try:
+            questions = await (task if task else _fetch_questions(data["goal"]))
+        finally:
+            stop.set()
+            typing_task.cancel()
 
     await state.update_data(questions=questions, current_q=0, answers=[])
     await _send_question(callback.message, state)
@@ -422,6 +444,19 @@ async def got_answer(callback: CallbackQuery, state: FSMContext):
 
     await state.update_data(level=level, qa_text=qa_text)
 
+    # Запускаем генерацию трека фоново, пока пользователь видит сообщение об уровне
+    weeks = data["months"] * 4
+    prompt = track_prompt(
+        goal=data["goal"],
+        level=level,
+        hours=data["hours"],
+        months=data["months"],
+        weeks=weeks,
+        qa_text=qa_text,
+    )
+    track_task = asyncio.create_task(_fetch_track(prompt))
+    _track_tasks[callback.from_user.id] = track_task
+
     await callback.message.answer(
         f"🎯 *Уровень определён*\n\n"
         f"*{level}*\n_{level_desc}_\n\n"
@@ -434,36 +469,43 @@ async def got_answer(callback: CallbackQuery, state: FSMContext):
 
 @dp.callback_query(F.data == "build_track")
 async def build_track(callback: CallbackQuery, state: FSMContext):
-    data = await state.get_data()
+    user_id = callback.from_user.id
+    task = _track_tasks.pop(user_id, None)
     await callback.message.edit_reply_markup(reply_markup=None)
-    msg = await callback.message.answer("🪐 Строю твой персональный трек...")
+    await callback.answer()
 
-    weeks = data["months"] * 4
-    prompt = track_prompt(
-        goal=data["goal"],
-        level=data["level"],
-        hours=data["hours"],
-        months=data["months"],
-        weeks=weeks,
-        qa_text=data["qa_text"],
-    )
-
+    stop = asyncio.Event()
+    typing_task = asyncio.create_task(_typing_loop(callback.message.chat.id, stop))
     try:
-        track_text = await asyncio.to_thread(call_gigachat, prompt)
-        logger.info(f"Track raw response (first 300): {track_text[:300]}")
-        stages = parse_track(track_text)
-        if not stages:
-            logger.error(f"parse_track returned empty. Full response:\n{track_text}")
-            raise ValueError("no stages")
+        if task and task.done():
+            stages = task.result()
+        else:
+            # Таск либо ещё идёт, либо не был запущен
+            if not task:
+                data = await state.get_data()
+                weeks = data["months"] * 4
+                prompt = track_prompt(
+                    goal=data["goal"],
+                    level=data["level"],
+                    hours=data["hours"],
+                    months=data["months"],
+                    weeks=weeks,
+                    qa_text=data["qa_text"],
+                )
+                task = asyncio.create_task(_fetch_track(prompt))
+            stages = await task
     except Exception as e:
+        stop.set()
+        typing_task.cancel()
         logger.error(f"Track generation failed: {e}")
-        await msg.edit_text("❌ Не удалось сгенерировать трек. Попробуй ещё раз — /start")
-        await callback.answer()
+        await callback.message.answer("❌ Не удалось сгенерировать трек. Попробуй ещё раз — /start")
         return
+    finally:
+        stop.set()
+        typing_task.cancel()
 
     await state.update_data(stages=stages, current_stage=0, completed=[])
     await state.set_state(Form.track)
-    await msg.delete()
     await callback.answer()
     await _send_stage(callback.message, state, 0)
 
