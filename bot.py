@@ -506,13 +506,16 @@ async def got_goal(message: Message, state: FSMContext):
 async def got_hours(callback: CallbackQuery, state: FSMContext):
     hours = int(callback.data.split("_")[1])
     await state.update_data(hours=hours)
-    await callback.message.edit_reply_markup(reply_markup=None)
+    await callback.answer()
+    try:
+        await callback.message.delete()
+    except Exception:
+        pass
     await callback.message.answer(
-        f"*{hours} ч/нед* — принято! За сколько месяцев хочешь достичь цели?",
+        f"*{hours} ч/нед* — принято. За сколько месяцев хочешь достичь цели?",
         reply_markup=kb_months(),
     )
     await state.set_state(Form.months)
-    await callback.answer()
 
 
 MOTIVATION_LABELS = {
@@ -533,26 +536,32 @@ FORMAT_LABELS = {
 async def got_months(callback: CallbackQuery, state: FSMContext):
     months = int(callback.data.split("_")[1])
     await state.update_data(months=months)
-    await callback.message.edit_reply_markup(reply_markup=None)
+    await callback.answer()
+    try:
+        await callback.message.delete()
+    except Exception:
+        pass
     await callback.message.answer(
         "*Что движет тобой?* Это поможет подобрать материалы точнее.",
         reply_markup=kb_motivation(),
     )
     await state.set_state(Form.motivation)
-    await callback.answer()
 
 
 @dp.callback_query(Form.motivation, F.data.startswith("mot_"))
 async def got_motivation(callback: CallbackQuery, state: FSMContext):
     motivation = MOTIVATION_LABELS[callback.data]
     await state.update_data(motivation=motivation)
-    await callback.message.edit_reply_markup(reply_markup=None)
+    await callback.answer()
+    try:
+        await callback.message.delete()
+    except Exception:
+        pass
     await callback.message.answer(
         "*Какой формат материалов предпочитаешь?*",
         reply_markup=kb_format(),
     )
     await state.set_state(Form.format_pref)
-    await callback.answer()
 
 
 @dp.callback_query(Form.format_pref, F.data.startswith("fmt_"))
@@ -560,7 +569,11 @@ async def got_format(callback: CallbackQuery, state: FSMContext):
     format_pref = FORMAT_LABELS[callback.data]
     await state.update_data(format_pref=format_pref)
     data = await state.get_data()
-    await callback.message.edit_reply_markup(reply_markup=None)
+    await callback.answer()
+    try:
+        await callback.message.delete()
+    except Exception:
+        pass
 
     user_id = callback.from_user.id
     task = _questions_tasks.pop(user_id, None)
@@ -581,7 +594,6 @@ async def got_format(callback: CallbackQuery, state: FSMContext):
     await state.update_data(questions=questions, current_q=0, answers=[])
     await _send_question(callback.message, state)
     await state.set_state(Form.quiz)
-    await callback.answer()
 
 
 async def _send_question(message: Message, state: FSMContext):
@@ -611,8 +623,11 @@ async def got_answer(callback: CallbackQuery, state: FSMContext):
     questions = data.get("questions", [])
 
     await state.update_data(answers=answers, current_q=current_q)
-    await callback.message.edit_reply_markup(reply_markup=None)
     await callback.answer(f"Ответ {letter} принят ✓")
+    try:
+        await callback.message.delete()
+    except Exception:
+        pass
 
     if current_q < len(questions):
         await _send_question(callback.message, state)
@@ -654,8 +669,7 @@ async def got_answer(callback: CallbackQuery, state: FSMContext):
         f"_{level_desc}_\n\n"
         f"*Мотивация:* {motivation}\n"
         f"*Формат:* {format_pref}\n"
-        f"*Время:* {data['hours']} ч/нед · {data['months']} мес\n\n"
-        f"Строю персональный трек — это займёт около минуты.",
+        f"*Время:* {data['hours']} ч/нед · {data['months']} мес",
         reply_markup=kb_build(),
     )
 
@@ -664,8 +678,13 @@ async def got_answer(callback: CallbackQuery, state: FSMContext):
 async def build_track(callback: CallbackQuery, state: FSMContext):
     user_id = callback.from_user.id
     task = _track_tasks.pop(user_id, None)
-    await callback.message.edit_reply_markup(reply_markup=None)
     await callback.answer()
+    try:
+        await callback.message.delete()
+    except Exception:
+        pass
+
+    loading_msg = await callback.message.answer("Строю персональный трек — это займёт около минуты...")
 
     stop = asyncio.Event()
     typing_task = asyncio.create_task(_typing_loop(callback.message.chat.id, stop))
@@ -673,7 +692,6 @@ async def build_track(callback: CallbackQuery, state: FSMContext):
         if task and task.done():
             stages, summary = task.result()
         else:
-            # Таск либо ещё идёт, либо не был запущен
             if not task:
                 data = await state.get_data()
                 weeks = data["months"] * 4
@@ -693,11 +711,20 @@ async def build_track(callback: CallbackQuery, state: FSMContext):
         stop.set()
         typing_task.cancel()
         logger.error(f"Track generation failed: {e}")
+        try:
+            await loading_msg.delete()
+        except Exception:
+            pass
         await callback.message.answer("❌ Не удалось сгенерировать трек. Попробуй ещё раз — /start")
         return
     finally:
         stop.set()
         typing_task.cancel()
+
+    try:
+        await loading_msg.delete()
+    except Exception:
+        pass
 
     await state.update_data(stages=stages, summary=summary, current_stage=0, completed=[])
     await state.set_state(Form.track)
