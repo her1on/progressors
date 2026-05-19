@@ -365,10 +365,17 @@ async def _send_question(message: Message, state: FSMContext):
     idx = data["current_q"]
     questions = data["questions"]
     q_text = questions[idx].get("question", questions[idx].get("q", f"Вопрос {idx + 1}"))
-    await message.answer(
-        f"📋 *Вопрос {idx + 1} из {len(questions)}*\n\n{q_text}",
-        reply_markup=kb_quiz(),
-    )
+    try:
+        await message.answer(
+            f"📋 *Вопрос {idx + 1} из {len(questions)}*\n\n{q_text}",
+            reply_markup=kb_quiz(),
+        )
+    except Exception:
+        await message.answer(
+            f"📋 Вопрос {idx + 1} из {len(questions)}\n\n{q_text}",
+            parse_mode=None,
+            reply_markup=kb_quiz(),
+        )
 
 
 @dp.callback_query(Form.quiz, F.data.startswith("q_"))
@@ -464,7 +471,15 @@ async def _send_stage(message: Message, state: FSMContext, idx: int):
     stage = stages[idx]
     is_last = idx == len(stages) - 1
     text = format_stage(stage, idx, len(stages))
-    await message.answer(text, reply_markup=kb_stage(idx, is_last))
+    try:
+        await message.answer(text, reply_markup=kb_stage(idx, is_last))
+    except Exception as e:
+        logger.warning(f"Markdown send failed for stage {idx}, retrying as plain text: {e}")
+        await message.answer(
+            re.sub(r"[*_`\[\]]", "", text),
+            parse_mode=None,
+            reply_markup=kb_stage(idx, is_last),
+        )
 
 
 @dp.callback_query(Form.track, F.data.startswith("done_"))
