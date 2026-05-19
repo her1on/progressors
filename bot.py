@@ -359,9 +359,15 @@ def _limit_source_lines(text: str, source: str, max_count: int) -> str:
 
 
 def format_stage(stage: dict, idx: int, total: int) -> str:
+    badge = {
+        "simplified": "[ Этап упрощён под твой уровень ]\n\n",
+        "advanced":   "[ Этап усложнён под твой уровень ]\n\n",
+        "alternative": "[ Альтернативные материалы ]\n\n",
+    }.get(stage.get("modified", ""), "")
     text = (
-        f"🪐 *Этап {idx + 1} из {total}: {stage['title']}*\n"
-        f"⏱ {stage['weeks']} нед\n\n"
+        f"{badge}"
+        f"*Этап {idx + 1} из {total}: {stage['title']}*\n"
+        f"{stage['weeks']} нед\n\n"
     )
     if stage.get("topics"):
         text += f"*Что изучать:*\n{stage['topics']}\n\n"
@@ -765,17 +771,31 @@ async def _send_stage(message: Message, state: FSMContext, idx: int):
         except Exception:
             pass
 
+    # Удаляем предыдущее сообщение этапа если он был изменён
+    if stage.get("modified"):
+        old_msg_id = data.get("stage_message_ids", {}).get(str(idx))
+        if old_msg_id:
+            try:
+                await bot.delete_message(chat_id=message.chat.id, message_id=old_msg_id)
+            except Exception:
+                pass
+
     no_preview = LinkPreviewOptions(is_disabled=True)
     try:
-        await message.answer(text[:4000], reply_markup=kb_stage(idx, is_last), link_preview_options=no_preview)
+        sent = await message.answer(text[:4000], reply_markup=kb_stage(idx, is_last), link_preview_options=no_preview)
     except Exception as e:
         logger.warning(f"Markdown send failed for stage {idx}, retrying as plain text: {e}")
-        await message.answer(
+        sent = await message.answer(
             re.sub(r"[*_`\[\]]", "", text[:4000]),
             parse_mode=None,
             reply_markup=kb_stage(idx, is_last),
             link_preview_options=no_preview,
         )
+
+    # Сохраняем message_id для возможного удаления при модификации
+    msg_ids = data.get("stage_message_ids", {})
+    msg_ids[str(idx)] = sent.message_id
+    await state.update_data(stage_message_ids=msg_ids)
 
 
 @dp.callback_query(Form.track, F.data.startswith("done_"))
@@ -829,6 +849,7 @@ async def stage_hard(callback: CallbackQuery, state: FSMContext):
         return
     stages[idx]["topics"] = result.strip()
     stages[idx]["materials"] = ""
+    stages[idx]["modified"] = "simplified"
     await state.update_data(stages=stages)
     await msg.delete()
     try:
@@ -857,6 +878,7 @@ async def stage_easy(callback: CallbackQuery, state: FSMContext):
         return
     stages[idx]["topics"] = result.strip()
     stages[idx]["materials"] = ""
+    stages[idx]["modified"] = "advanced"
     await state.update_data(stages=stages)
     await msg.delete()
     try:
@@ -884,6 +906,7 @@ async def stage_bad(callback: CallbackQuery, state: FSMContext):
         await msg.edit_text("❌ Не удалось подобрать альтернативу.")
         return
     stages[idx]["materials"] = result.strip()
+    stages[idx]["modified"] = "alternative"
     await state.update_data(stages=stages)
     await msg.delete()
     try:
