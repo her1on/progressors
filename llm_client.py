@@ -16,7 +16,7 @@ def _get_client() -> OpenAI:
     return _client
 
 
-def call_gigachat(prompt: str) -> str:
+def call_llm(prompt: str) -> str:
     client = _get_client()
     for attempt in range(3):
         try:

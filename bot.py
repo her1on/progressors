@@ -33,7 +33,7 @@ from bot_prompts import (
     track_prompt,
     validate_prompt,
 )
-from gigachat_client import call_gigachat
+from llm_client import call_llm
 from level import parse_questions
 from stepik import search_stepik_courses
 from youtube import search_youtube_video
@@ -78,7 +78,7 @@ async def _typing_loop(chat_id: int, stop: asyncio.Event) -> None:
 
 async def _fetch_questions(goal: str) -> list[dict]:
     try:
-        raw = await asyncio.to_thread(call_gigachat, questions_prompt(goal))
+        raw = await asyncio.to_thread(call_llm, questions_prompt(goal))
         questions = parse_questions(raw)
         if questions:
             return questions
@@ -96,7 +96,7 @@ async def _fetch_questions(goal: str) -> list[dict]:
 async def _validate_goal(goal: str) -> tuple[str, str]:
     """Возвращает (status, message). status: ok | abstract | institutional | unrealistic."""
     try:
-        raw = await asyncio.to_thread(call_gigachat, validate_prompt(goal))
+        raw = await asyncio.to_thread(call_llm, validate_prompt(goal))
         lines = raw.strip().splitlines()
         first = lines[0].strip().upper()
         explanation = lines[1].strip() if len(lines) > 1 else ""
@@ -112,7 +112,7 @@ async def _validate_goal(goal: str) -> tuple[str, str]:
 
 
 async def _fetch_track(prompt: str) -> tuple[list[dict], str]:
-    track_text = await asyncio.to_thread(call_gigachat, prompt)
+    track_text = await asyncio.to_thread(call_llm, prompt)
     logger.info(f"Track raw response (first 300): {track_text[:300]}")
     stages, summary = parse_track(track_text)
     if not stages:
@@ -808,7 +808,7 @@ async def stage_hard(callback: CallbackQuery, state: FSMContext):
 
     prompt = simplify_prompt(data["goal"], data["level"], stage["title"], stage["topics"])
     try:
-        result = await asyncio.to_thread(call_gigachat, prompt)
+        result = await asyncio.to_thread(call_llm, prompt)
     except Exception:
         await msg.edit_text("❌ Не удалось адаптировать. Попробуй перейти к следующему этапу.")
         return
@@ -832,7 +832,7 @@ async def stage_easy(callback: CallbackQuery, state: FSMContext):
 
     prompt = advance_prompt(data["goal"], data["level"], stage["title"], stage["topics"])
     try:
-        result = await asyncio.to_thread(call_gigachat, prompt)
+        result = await asyncio.to_thread(call_llm, prompt)
     except Exception:
         await msg.edit_text("❌ Не удалось усложнить. Попробуй перейти к следующему этапу.")
         return
@@ -856,7 +856,7 @@ async def stage_bad(callback: CallbackQuery, state: FSMContext):
 
     prompt = alternative_prompt(data["goal"], data["level"], stage["title"], stage["topics"])
     try:
-        result = await asyncio.to_thread(call_gigachat, prompt)
+        result = await asyncio.to_thread(call_llm, prompt)
     except Exception:
         await msg.edit_text("❌ Не удалось подобрать альтернативу.")
         return
