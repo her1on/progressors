@@ -93,7 +93,7 @@ async def _validate_goal(goal: str) -> tuple[str, str]:
     """Возвращает (status, message). status: ok | abstract | institutional | unrealistic."""
     try:
         raw = await asyncio.to_thread(call_gigachat, validate_prompt(goal))
-        print(f"[VALIDATE] goal={goal!r} raw={raw!r}", flush=True)
+        logger.warning(f"[VALIDATE] goal={goal!r} raw={raw!r}")
         lines = raw.strip().splitlines()
         first = lines[0].strip()
         explanation = lines[1].strip() if len(lines) > 1 else ""
@@ -104,7 +104,7 @@ async def _validate_goal(goal: str) -> tuple[str, str]:
         if "ИНСТИТУЦИОНАЛЬНЫЙ" in first:
             return "institutional", explanation
     except Exception as e:
-        print(f"[VALIDATE ERROR] goal={goal!r} error={e!r}", flush=True)
+        logger.warning(f"[VALIDATE ERROR] goal={goal!r} error={e!r}")
     return "ok", ""
 
 
@@ -348,6 +348,7 @@ async def cmd_start(message: Message, state: FSMContext):
 @dp.message(Command("help"))
 @dp.message(F.text == "❓ Помощь")
 async def cmd_help(message: Message):
+    logger.warning(f"[CMD_HELP] user={message.from_user.id}")
     await message.answer(
         "*Прогрессоры* — ИИ-навигатор по обучению\n\n"
         "*Как это работает:*\n"
@@ -375,6 +376,7 @@ async def menu_new_route(message: Message, state: FSMContext):
 
 @dp.message(Command("cancel"))
 async def cmd_cancel(message: Message, state: FSMContext):
+    logger.warning(f"[CMD_CANCEL] user={message.from_user.id}")
     current = await state.get_state()
     if current is None:
         await message.answer("Нечего отменять. Введи /start чтобы начать.")
