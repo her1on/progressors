@@ -132,7 +132,7 @@ class Form(StatesGroup):
 def kb_menu():
     return ReplyKeyboardMarkup(
         keyboard=[
-            [KeyboardButton(text="🚀 Новый маршрут"), KeyboardButton(text="❓ Помощь")],
+            [KeyboardButton(text="Новый маршрут"), KeyboardButton(text="❓ Помощь")],
         ],
         resize_keyboard=True,
         persistent=True,
