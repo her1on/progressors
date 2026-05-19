@@ -388,8 +388,8 @@ async def cmd_help(message: Message):
         "*Прогрессоры* — ИИ-навигатор по обучению\n\n"
         "*Как это работает:*\n"
         "1. Скажи чему хочешь научиться\n"
-        "2. Укажи сколько времени готов тратить\n"
-        "3. Пройди короткую диагностику\n"
+        "2. Укажи время и срок, выбери мотивацию и формат\n"
+        "3. Пройди короткую диагностику уровня\n"
         "4. Получи персональный трек с бесплатными материалами\n\n"
         "*Команды:*\n"
         "/start — начать или перезапустить\n"
@@ -397,8 +397,9 @@ async def cmd_help(message: Message):
         "/help — эта справка\n\n"
         "*На каждом этапе трека можно:*\n"
         "✅ Отметить как пройденное\n"
-        "😕 Попросить упростить материал\n"
-        "👎 Получить альтернативные ресурсы\n"
+        "😕 Слишком сложно — упростить материал\n"
+        "😊 Слишком просто — усложнить материал\n"
+        "👎 Не подошло — получить альтернативные ресурсы\n"
         "➡️ Пропустить и перейти дальше",
         reply_markup=kb_menu(),
     )
@@ -504,7 +505,7 @@ async def got_months(callback: CallbackQuery, state: FSMContext):
     await state.update_data(months=months)
     await callback.message.edit_reply_markup(reply_markup=None)
     await callback.message.answer(
-        "🎯 *Зачем хочешь это изучить?*",
+        "🎯 *Что движет тобой?* Это поможет подобрать материалы точнее.",
         reply_markup=kb_motivation(),
     )
     await state.set_state(Form.motivation)
@@ -627,7 +628,7 @@ async def got_answer(callback: CallbackQuery, state: FSMContext):
         f"{mot_emoji} *Мотивация:* {motivation}\n"
         f"{fmt_emoji} *Формат:* {format_pref}\n"
         f"⏱ *Время:* {data['hours']} ч/нед · {data['months']} мес\n\n"
-        f"Строим персональный трек!",
+        f"⏳ Строю персональный трек — это займёт около минуты.",
         reply_markup=kb_build(),
     )
 
@@ -719,9 +720,10 @@ async def _send_stage(message: Message, state: FSMContext, idx: int):
 
     if idx >= len(stages):
         await message.answer(
-            "🌟 *Маршрут пройден! Поздравляю!*\n\n"
+            "🏆 *Маршрут пройден! Поздравляю!*\n\n"
             f"Ты прошёл весь трек по теме *{escape_md(data.get('goal', ''))}*.\n\n"
-            "Хочешь построить новый маршрут?",
+            "Это большой шаг — продолжай в том же духе! "
+            "Хочешь закрепить результат или освоить что-то новое?",
             reply_markup=kb_restart(),
         )
         await message.answer("Используй кнопки ниже или введи новую цель:", reply_markup=kb_menu())
