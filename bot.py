@@ -392,6 +392,7 @@ async def cmd_cancel(message: Message, state: FSMContext):
 @dp.message(Form.goal)
 async def got_goal(message: Message, state: FSMContext):
     goal = message.text.strip()
+    logger.warning(f"[GOT_GOAL] user={message.from_user.id} goal={goal!r}")
     if not goal or not any(c.isalpha() for c in goal):
         await message.answer(
             "Пожалуйста, напиши конкретную цель — например, _Python_, _дизайн_ или _английский язык_."
@@ -405,6 +406,8 @@ async def got_goal(message: Message, state: FSMContext):
     finally:
         stop.set()
         typing_task.cancel()
+
+    logger.warning(f"[VALIDATE_RESULT] goal={goal!r} status={status!r}")
 
     if status == "unrealistic":
         await message.answer(f"❌ {explanation}\n\nПопробуй сформулировать цель иначе.")
