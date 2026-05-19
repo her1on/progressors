@@ -35,6 +35,7 @@ from bot_prompts import (
 from gigachat_client import call_gigachat
 from level import parse_questions
 from stepik import search_stepik_courses
+from youtube import search_youtube_video
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -676,6 +677,21 @@ async def build_track(callback: CallbackQuery, state: FSMContext):
     await _send_stage(callback.message, state, 0)
 
 
+async def _resolve_youtube_links(text: str) -> str:
+    """Replace YouTube search URLs with direct video URLs via API."""
+    pattern = re.compile(
+        r"\[YouTube: ([^\]]+)\]\((https://www\.youtube\.com/results\?search_query=[^)]+)\)"
+    )
+    for title, search_url in pattern.findall(text):
+        try:
+            video_url = await asyncio.to_thread(search_youtube_video, title)
+            if video_url:
+                text = text.replace(search_url, video_url)
+        except Exception:
+            pass
+    return text
+
+
 async def _resolve_stepik_links(text: str) -> str:
     """Заменяет поисковые ссылки Stepik на прямые URL через API."""
     stepik_pattern = re.compile(r"\[Stepik: ([^\]]+)\]\((https://stepik\.org/search\?query=[^)]+)\)")
@@ -706,7 +722,9 @@ async def _send_stage(message: Message, state: FSMContext, idx: int):
 
     stage = stages[idx]
     is_last = idx == len(stages) - 1
-    text = await _resolve_stepik_links(format_stage(stage, idx, len(stages)))
+    text = format_stage(stage, idx, len(stages))
+    text = await _resolve_youtube_links(text)
+    text = await _resolve_stepik_links(text)
 
     try:
         courses = await asyncio.to_thread(search_stepik_courses, data.get("goal", stage["title"]), 0, 3)
