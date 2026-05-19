@@ -699,6 +699,20 @@ async def _send_stage(message: Message, state: FSMContext, idx: int):
     text = await _resolve_stepik_links(format_stage(stage, idx, len(stages)))
 
     try:
+        courses = await asyncio.to_thread(search_stepik_courses, stage["title"], 0, 3)
+        if courses:
+            lines = ["\n📚 *Курсы на Stepik по этому этапу:*\n"]
+            for c in courses:
+                price_text = "бесплатно" if c["price"] == 0 else f"{c['price']} ₽"
+                lines.append(f"• [{c['title']}]({c['url']}) — {price_text}")
+            stepik_block = "\n".join(lines)
+            combined = text + stepik_block
+            if len(combined) <= 4000:
+                text = combined
+    except Exception:
+        pass
+
+    try:
         await message.answer(text[:4000], reply_markup=kb_stage(idx, is_last))
     except Exception as e:
         logger.warning(f"Markdown send failed for stage {idx}, retrying as plain text: {e}")
@@ -707,17 +721,6 @@ async def _send_stage(message: Message, state: FSMContext, idx: int):
             parse_mode=None,
             reply_markup=kb_stage(idx, is_last),
         )
-
-    try:
-        courses = await asyncio.to_thread(search_stepik_courses, stage["title"], 0, 3)
-        if courses:
-            lines = ["📚 *Курсы на Stepik по этому этапу:*\n"]
-            for c in courses:
-                price_text = "бесплатно" if c["price"] == 0 else f"{c['price']} ₽"
-                lines.append(f"• [{c['title']}]({c['url']}) — {price_text}")
-            await message.answer("\n".join(lines))
-    except Exception:
-        pass
 
 
 @dp.callback_query(Form.track, F.data.startswith("done_"))
