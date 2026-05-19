@@ -25,6 +25,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 from bot_prompts import (
+    advance_prompt,
     alternative_prompt,
     questions_prompt,
     simplify_prompt,
@@ -108,14 +109,14 @@ async def _validate_goal(goal: str) -> tuple[str, str]:
     return "ok", ""
 
 
-async def _fetch_track(prompt: str) -> list[dict]:
+async def _fetch_track(prompt: str) -> tuple[list[dict], str]:
     track_text = await asyncio.to_thread(call_gigachat, prompt)
     logger.info(f"Track raw response (first 300): {track_text[:300]}")
-    stages = parse_track(track_text)
+    stages, summary = parse_track(track_text)
     if not stages:
         logger.error(f"parse_track returned empty. Full response:\n{track_text}")
         raise ValueError("no stages")
-    return stages
+    return stages, summary
 
 
 # ── FSM States ────────────────────────────────────────────────────────────────
@@ -200,8 +201,9 @@ def kb_stage(idx: int, is_last: bool):
         [InlineKeyboardButton(text="✅ Пройдено", callback_data=f"done_{idx}")],
         [
             InlineKeyboardButton(text="😕 Сложно", callback_data=f"hard_{idx}"),
-            InlineKeyboardButton(text="👎 Не подошло", callback_data=f"bad_{idx}"),
+            InlineKeyboardButton(text="😊 Просто", callback_data=f"easy_{idx}"),
         ],
+        [InlineKeyboardButton(text="👎 Не подошло", callback_data=f"bad_{idx}")],
     ]
     nav = []
     if idx > 0:
@@ -266,9 +268,10 @@ def calc_level(answers: list[str]) -> str:
     return "Продвинутый"
 
 
-def parse_track(text: str) -> list[dict]:
+def parse_track(text: str) -> tuple[list[dict], str]:
     text = re.sub(r"```[a-zA-Z]*\n?", "", text).replace("```", "").strip()
     stages = []
+    summary = ""
 
     # Разбиваем по любому заголовку ## уровня (включая ###)
     parts = re.split(r"\n(?=#{2,3}\s)", "\n" + text)
@@ -276,8 +279,9 @@ def parse_track(text: str) -> list[dict]:
     for part in parts:
         first_line = part.split("\n")[0]
 
-        # Пропускаем итоговый раздел и пустые части
+        # Захватываем итоговый раздел
         if re.search(r"Итог|Результат трека|Карьер", first_line, re.IGNORECASE):
+            summary = "\n".join(part.split("\n")[1:]).strip()
             continue
         # Блок должен выглядеть как этап: содержит цифру или слова Этап/Шаг/Step
         if not re.search(r"(?:Этап|Шаг|Step|\d+)", first_line, re.IGNORECASE):
@@ -332,7 +336,7 @@ def parse_track(text: str) -> list[dict]:
             "outcome": outcome,
         })
 
-    return stages
+    return stages, summary
 
 
 def _remove_stepik_lines(text: str) -> str:
@@ -636,7 +640,7 @@ async def build_track(callback: CallbackQuery, state: FSMContext):
     typing_task = asyncio.create_task(_typing_loop(callback.message.chat.id, stop))
     try:
         if task and task.done():
-            stages = task.result()
+            stages, summary = task.result()
         else:
             # Таск либо ещё идёт, либо не был запущен
             if not task:
@@ -653,7 +657,7 @@ async def build_track(callback: CallbackQuery, state: FSMContext):
                     format_pref=data.get("format_pref", ""),
                 )
                 task = asyncio.create_task(_fetch_track(prompt))
-            stages = await task
+            stages, summary = await task
     except Exception as e:
         stop.set()
         typing_task.cancel()
@@ -664,8 +668,10 @@ async def build_track(callback: CallbackQuery, state: FSMContext):
         stop.set()
         typing_task.cancel()
 
-    await state.update_data(stages=stages, current_stage=0, completed=[])
+    await state.update_data(stages=stages, summary=summary, current_stage=0, completed=[])
     await state.set_state(Form.track)
+    if summary:
+        await callback.message.answer(f"🎯 *Карьерные перспективы после трека:*\n\n{summary}")
     await _send_stage(callback.message, state, 0)
 
 
@@ -779,6 +785,29 @@ async def stage_hard(callback: CallbackQuery, state: FSMContext):
         await _send_stage(callback.message, state, idx)
     except Exception:
         await msg.edit_text("❌ Не удалось адаптировать. Попробуй перейти к следующему этапу.")
+
+
+@dp.callback_query(Form.track, F.data.startswith("easy_"))
+async def stage_easy(callback: CallbackQuery, state: FSMContext):
+    idx = int(callback.data.split("_")[1])
+    data = await state.get_data()
+    stages = data.get("stages", [])
+    stage = stages[idx]
+
+    await callback.message.edit_reply_markup(reply_markup=None)
+    await callback.answer("Усложняю материал...")
+    msg = await callback.message.answer("⏳ Подбираю более продвинутые материалы...")
+
+    prompt = advance_prompt(data["goal"], data["level"], stage["title"], stage["topics"])
+    try:
+        result = await asyncio.to_thread(call_gigachat, prompt)
+        stages[idx]["topics"] = result.strip()
+        stages[idx]["materials"] = ""
+        await state.update_data(stages=stages)
+        await msg.delete()
+        await _send_stage(callback.message, state, idx)
+    except Exception:
+        await msg.edit_text("❌ Не удалось усложнить. Попробуй перейти к следующему этапу.")
 
 
 @dp.callback_query(Form.track, F.data.startswith("bad_"))

@@ -151,6 +151,17 @@ def simplify_prompt(goal: str, level: str, stage_title: str, stage_content: str)
 Ответь просто текстом без markdown-заголовков."""
 
 
+def advance_prompt(goal: str, level: str, stage_title: str, stage_content: str) -> str:
+    return f"""Пользователь изучает «{goal}» (уровень: {level}).
+
+Этап «{stage_title}» оказался слишком простым:
+{stage_content[:600]}
+
+Перепиши содержимое этапа сложнее: добавь углублённые темы, практические задачи и мини-проекты.
+Также предложи 2-3 более продвинутых бесплатных русскоязычных материала (YouTube, Stepik, Habr).
+Ответь просто текстом без markdown-заголовков."""
+
+
 def alternative_prompt(goal: str, level: str, stage_title: str, stage_content: str) -> str:
     return f"""Пользователь изучает «{goal}» (уровень: {level}).
 
