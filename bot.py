@@ -236,7 +236,6 @@ _SOURCE_SEARCH = {
     "stepik":   "https://stepik.org/search?query={}",
     "habr":     "https://habr.com/ru/search/?q={}&target_type=posts",
     "rutube":   "https://rutube.ru/search/?query={}",
-    "github":   "https://github.com/search?q={}",
     "vk":       "https://vk.com/video?q={}",
     "vk видео": "https://vk.com/video?q={}",
 }
@@ -347,6 +346,18 @@ def _remove_stepik_lines(text: str) -> str:
     return "\n".join(lines).strip()
 
 
+def _limit_source_lines(text: str, source: str, max_count: int) -> str:
+    count = 0
+    result = []
+    for line in text.split("\n"):
+        if re.search(rf"\[{source}\]", line, re.IGNORECASE):
+            count += 1
+            if count > max_count:
+                continue
+        result.append(line)
+    return "\n".join(result).strip()
+
+
 def format_stage(stage: dict, idx: int, total: int) -> str:
     text = (
         f"🪐 *Этап {idx + 1} из {total}: {stage['title']}*\n"
@@ -356,6 +367,8 @@ def format_stage(stage: dict, idx: int, total: int) -> str:
         text += f"*Что изучать:*\n{stage['topics']}\n\n"
     if stage.get("materials"):
         materials = _remove_stepik_lines(stage["materials"])
+        materials = _limit_source_lines(materials, "YouTube", 2)
+        materials = _limit_source_lines(materials, "GitHub", 0)
         if materials:
             text += f"*Материалы:*\n{linkify_materials(materials)}\n\n"
     if stage.get("outcome"):
