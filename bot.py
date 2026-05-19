@@ -700,18 +700,44 @@ async def restart(callback: CallbackQuery, state: FSMContext):
     await cmd_start(callback.message, state)
 
 
-# ── Entry point ───────────────────────────────────────────────────────────────
+# ── Entry point (webhook) ─────────────────────────────────────────────────────
 
-async def main():
-    logger.info("Bot starting...")
+WEBHOOK_PATH = "/webhook"
+WEBHOOK_SECRET = os.getenv("WEBHOOK_SECRET", "progressors-secret-2026")
+
+
+async def on_startup(bot: Bot) -> None:
+    domain = os.getenv("RAILWAY_PUBLIC_DOMAIN", "")
+    if not domain:
+        logger.error("RAILWAY_PUBLIC_DOMAIN not set — webhook will not work!")
+        return
+    webhook_url = f"https://{domain}{WEBHOOK_PATH}"
     await bot.delete_webhook(drop_pending_updates=True)
+    await bot.set_webhook(url=webhook_url, secret_token=WEBHOOK_SECRET, drop_pending_updates=True)
+    logger.info(f"Webhook registered: {webhook_url}")
     await bot.set_my_commands([
         BotCommand(command="start", description="Начать / перезапустить"),
         BotCommand(command="cancel", description="Отменить текущий процесс"),
         BotCommand(command="help", description="Справка"),
     ])
-    await dp.start_polling(bot, allowed_updates=dp.resolve_used_update_types())
+
+
+async def on_shutdown(bot: Bot) -> None:
+    await bot.delete_webhook()
+    logger.info("Webhook removed on shutdown")
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    from aiohttp import web
+    from aiogram.webhook.aiohttp_server import SimpleRequestHandler, setup_application
+
+    dp.startup.register(on_startup)
+    dp.shutdown.register(on_shutdown)
+
+    app = web.Application()
+    SimpleRequestHandler(dispatcher=dp, bot=bot, secret_token=WEBHOOK_SECRET).register(app, path=WEBHOOK_PATH)
+    setup_application(app, dp, bot=bot)
+
+    port = int(os.getenv("PORT", 8080))
+    logger.info(f"Starting webhook server on port {port}")
+    web.run_app(app, host="0.0.0.0", port=port)
