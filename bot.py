@@ -782,7 +782,7 @@ async def _resolve_stepik_links(text: str) -> str:
     return text
 
 
-async def _send_stage(message: Message, state: FSMContext, idx: int):
+async def _send_stage(message: Message, state: FSMContext, idx: int, edit: bool = False):
     data = await state.get_data()
     stages = data.get("stages", [])
 
@@ -830,16 +830,22 @@ async def _send_stage(message: Message, state: FSMContext, idx: int):
                 pass
 
     no_preview = LinkPreviewOptions(is_disabled=True)
-    try:
-        sent = await message.answer(text[:4000], reply_markup=kb_stage(idx, is_last), link_preview_options=no_preview)
-    except Exception as e:
-        logger.warning(f"Markdown send failed for stage {idx}, retrying as plain text: {e}")
-        sent = await message.answer(
-            re.sub(r"[*_`\[\]]", "", text[:4000]),
-            parse_mode=None,
-            reply_markup=kb_stage(idx, is_last),
-            link_preview_options=no_preview,
-        )
+    if edit:
+        try:
+            sent = await message.edit_text(text[:4000], reply_markup=kb_stage(idx, is_last), link_preview_options=no_preview)
+        except Exception:
+            sent = await message.answer(text[:4000], reply_markup=kb_stage(idx, is_last), link_preview_options=no_preview)
+    else:
+        try:
+            sent = await message.answer(text[:4000], reply_markup=kb_stage(idx, is_last), link_preview_options=no_preview)
+        except Exception as e:
+            logger.warning(f"Markdown send failed for stage {idx}, retrying as plain text: {e}")
+            sent = await message.answer(
+                re.sub(r"[*_`\[\]]", "", text[:4000]),
+                parse_mode=None,
+                reply_markup=kb_stage(idx, is_last),
+                link_preview_options=no_preview,
+            )
 
     # Сохраняем message_id для возможного удаления при модификации
     msg_ids = data.get("stage_message_ids", {})
@@ -864,9 +870,8 @@ async def stage_done(callback: CallbackQuery, state: FSMContext):
 async def stage_next(callback: CallbackQuery, state: FSMContext):
     idx = int(callback.data.split("_")[1])
     await state.update_data(current_stage=idx + 1)
-    await callback.message.edit_reply_markup(reply_markup=None)
     await callback.answer()
-    await _send_stage(callback.message, state, idx + 1)
+    await _send_stage(callback.message, state, idx + 1, edit=True)
 
 
 @dp.callback_query(Form.track, F.data.startswith("prev_"))
@@ -874,9 +879,8 @@ async def stage_prev(callback: CallbackQuery, state: FSMContext):
     idx = int(callback.data.split("_")[1])
     prev_idx = idx - 1
     await state.update_data(current_stage=prev_idx)
-    await callback.message.edit_reply_markup(reply_markup=None)
     await callback.answer()
-    await _send_stage(callback.message, state, prev_idx)
+    await _send_stage(callback.message, state, prev_idx, edit=True)
 
 
 @dp.callback_query(Form.track, F.data.startswith("hard_"))
