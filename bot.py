@@ -93,7 +93,6 @@ async def _validate_goal(goal: str) -> tuple[str, str]:
     """Возвращает (status, message). status: ok | abstract | institutional | unrealistic."""
     try:
         raw = await asyncio.to_thread(call_gigachat, validate_prompt(goal))
-        logger.warning(f"[VALIDATE] goal={goal!r} raw={raw!r}")
         lines = raw.strip().splitlines()
         first = lines[0].strip().upper()
         explanation = lines[1].strip() if len(lines) > 1 else ""
@@ -348,7 +347,6 @@ async def cmd_start(message: Message, state: FSMContext):
 @dp.message(Command("help"))
 @dp.message(F.text == "❓ Помощь")
 async def cmd_help(message: Message):
-    logger.warning(f"[CMD_HELP] user={message.from_user.id}")
     await message.answer(
         "*Прогрессоры* — ИИ-навигатор по обучению\n\n"
         "*Как это работает:*\n"
@@ -376,7 +374,6 @@ async def menu_new_route(message: Message, state: FSMContext):
 
 @dp.message(Command("cancel"))
 async def cmd_cancel(message: Message, state: FSMContext):
-    logger.warning(f"[CMD_CANCEL] user={message.from_user.id}")
     current = await state.get_state()
     if current is None:
         await message.answer("Нечего отменять. Введи /start чтобы начать.")
@@ -392,7 +389,6 @@ async def cmd_cancel(message: Message, state: FSMContext):
 @dp.message(Form.goal)
 async def got_goal(message: Message, state: FSMContext):
     goal = message.text.strip()
-    logger.warning(f"[GOT_GOAL] user={message.from_user.id} goal={goal!r}")
     if not goal or not any(c.isalpha() for c in goal):
         await message.answer(
             "Пожалуйста, напиши конкретную цель — например, _Python_, _дизайн_ или _английский язык_."
@@ -406,8 +402,6 @@ async def got_goal(message: Message, state: FSMContext):
     finally:
         stop.set()
         typing_task.cancel()
-
-    logger.warning(f"[VALIDATE_RESULT] goal={goal!r} status={status!r}")
 
     if status == "unrealistic":
         await message.answer(f"❌ {explanation}\n\nПопробуй сформулировать цель иначе.")
@@ -739,21 +733,7 @@ if __name__ == "__main__":
     dp.startup.register(on_startup)
     dp.shutdown.register(on_shutdown)
 
-    async def health(request):
-        info = await bot.get_webhook_info()
-        token_tail = BOT_TOKEN[-6:] if BOT_TOKEN else "NONE"
-        domain = os.getenv("RAILWAY_PUBLIC_DOMAIN", "NOT SET")
-        return web.Response(text=(
-            f"token_tail=...{token_tail}\n"
-            f"RAILWAY_PUBLIC_DOMAIN={domain!r}\n"
-            f"webhook_url={info.url!r}\n"
-            f"pending_updates={info.pending_update_count}\n"
-            f"last_error={info.last_error_message!r}\n"
-            f"last_error_date={info.last_error_date}\n"
-        ))
-
     app = web.Application()
-    app.router.add_get("/health", health)
     SimpleRequestHandler(dispatcher=dp, bot=bot, secret_token=WEBHOOK_SECRET).register(app, path=WEBHOOK_PATH)
     setup_application(app, dp, bot=bot)
 
