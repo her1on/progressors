@@ -230,7 +230,7 @@ def escape_md(text: str) -> str:
 _SOURCE_SEARCH = {
     "youtube":  "https://www.youtube.com/results?search_query={}",
     "stepik":   "https://stepik.org/search?query={}",
-    "habr":     "https://habr.com/ru/search/?q={}",
+    "habr":     "https://habr.com/ru/search/?q={}&target_type=posts",
     "rutube":   "https://rutube.ru/search/?query={}",
     "github":   "https://github.com/search?q={}",
     "vk":       "https://vk.com/video?q={}",
@@ -676,6 +676,24 @@ async def build_track(callback: CallbackQuery, state: FSMContext):
     await _send_stage(callback.message, state, 0)
 
 
+async def _resolve_stepik_links(text: str) -> str:
+    """Заменяет поисковые ссылки Stepik на прямые URL через API."""
+    stepik_pattern = re.compile(r"\[Stepik: ([^\]]+)\]\(https://stepik\.org/search\?query=[^)]+\)")
+    matches = stepik_pattern.findall(text)
+    if not matches:
+        return text
+    for title in matches:
+        try:
+            courses = await asyncio.to_thread(search_stepik_courses, title, 0, 1)
+            if courses:
+                direct_url = courses[0]["url"]
+                old = f"(https://stepik.org/search?query={urllib.parse.quote_plus(title)})"
+                text = text.replace(old, f"({direct_url})")
+        except Exception:
+            pass
+    return text
+
+
 async def _send_stage(message: Message, state: FSMContext, idx: int):
     data = await state.get_data()
     stages = data.get("stages", [])
@@ -692,7 +710,7 @@ async def _send_stage(message: Message, state: FSMContext, idx: int):
 
     stage = stages[idx]
     is_last = idx == len(stages) - 1
-    text = format_stage(stage, idx, len(stages))
+    text = await _resolve_stepik_links(format_stage(stage, idx, len(stages)))
     try:
         await message.answer(text, reply_markup=kb_stage(idx, is_last))
     except Exception as e:
