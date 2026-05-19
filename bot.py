@@ -29,6 +29,7 @@ from bot_prompts import (
     questions_prompt,
     simplify_prompt,
     track_prompt,
+    validate_prompt,
 )
 from gigachat_client import call_gigachat
 from level import parse_questions
@@ -85,6 +86,24 @@ async def _fetch_questions(goal: str) -> list[dict]:
         {"question": f"В какой мере ты применял «{goal}» на практике?"},
         {"question": f"Насколько ты знаком с продвинутыми аспектами «{goal}»?"},
     ]
+
+
+async def _validate_goal(goal: str) -> tuple[str, str]:
+    """Возвращает (status, message). status: ok | abstract | institutional | unrealistic."""
+    try:
+        raw = await asyncio.to_thread(call_gigachat, validate_prompt(goal))
+        lines = raw.strip().splitlines()
+        first = lines[0].strip()
+        explanation = lines[1].strip() if len(lines) > 1 else ""
+        if "НЕРЕАЛИСТИЧНО" in first:
+            return "unrealistic", explanation or "Цель физически невозможна."
+        if "АБСТРАКТНО" in first:
+            return "abstract", explanation or "Уточни цель — укажи конкретный навык."
+        if "ИНСТИТУЦИОНАЛЬНЫЙ" in first:
+            return "institutional", explanation
+    except Exception:
+        pass
+    return "ok", ""
 
 
 async def _fetch_track(prompt: str) -> list[dict]:
@@ -375,11 +394,37 @@ async def got_goal(message: Message, state: FSMContext):
         )
         return
 
+    stop = asyncio.Event()
+    typing_task = asyncio.create_task(_typing_loop(message.chat.id, stop))
+    try:
+        status, explanation = await _validate_goal(goal)
+    finally:
+        stop.set()
+        typing_task.cancel()
+
+    if status == "unrealistic":
+        await message.answer(f"❌ {explanation}\n\nПопробуй сформулировать цель иначе.")
+        return
+
+    if status == "abstract":
+        await message.answer(
+            f"🤔 Цель слишком размытая.\n\n{explanation}"
+        )
+        return
+
+    if status == "institutional":
+        await message.answer(
+            f"🏛 *Это институциональная профессия*\n\n"
+            f"{explanation}\n\n"
+            f"Я не смогу помочь попасть туда напрямую, но могу составить трек по смежным навыкам. "
+            f"Напиши конкретный навык — например, _физика_, _аэродинамика_, _лётная подготовка_.",
+        )
+        return
+
     # Запускаем генерацию вопросов фоново, пока пользователь выбирает часы и месяцы
     questions_task = asyncio.create_task(_fetch_questions(goal))
-    await state.update_data(goal=goal, questions_task=None)
-    # Храним task в глобальном словаре (FSM не сериализует asyncio.Task)
     _questions_tasks[message.from_user.id] = questions_task
+    await state.update_data(goal=goal)
 
     await message.answer(
         f"Отлично! Цель: *{escape_md(goal)}*\n\nСколько часов в неделю готов уделять учёбе?",
