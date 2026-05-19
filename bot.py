@@ -16,6 +16,7 @@ from aiogram.types import (
     InlineKeyboardButton,
     InlineKeyboardMarkup,
     KeyboardButton,
+    LinkPreviewOptions,
     Message,
     ReplyKeyboardMarkup,
     ReplyKeyboardRemove,
@@ -745,15 +746,16 @@ async def _send_stage(message: Message, state: FSMContext, idx: int):
         except Exception:
             pass
 
+    no_preview = LinkPreviewOptions(is_disabled=True)
     try:
-        await message.answer(text[:4000], reply_markup=kb_stage(idx, is_last), disable_web_page_preview=True)
+        await message.answer(text[:4000], reply_markup=kb_stage(idx, is_last), link_preview_options=no_preview)
     except Exception as e:
         logger.warning(f"Markdown send failed for stage {idx}, retrying as plain text: {e}")
         await message.answer(
             re.sub(r"[*_`\[\]]", "", text[:4000]),
             parse_mode=None,
             reply_markup=kb_stage(idx, is_last),
-            disable_web_page_preview=True,
+            link_preview_options=no_preview,
         )
 
 
