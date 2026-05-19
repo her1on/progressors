@@ -740,7 +740,12 @@ if __name__ == "__main__":
     dp.startup.register(on_startup)
     dp.shutdown.register(on_shutdown)
 
+    async def health(request):
+        logger.warning("[HEALTH] health check called")
+        return web.Response(text="OK")
+
     app = web.Application()
+    app.router.add_get("/health", health)
     SimpleRequestHandler(dispatcher=dp, bot=bot, secret_token=WEBHOOK_SECRET).register(app, path=WEBHOOK_PATH)
     setup_application(app, dp, bot=bot)
 
