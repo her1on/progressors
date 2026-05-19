@@ -1,4 +1,4 @@
-gigachat
+openai
 python-dotenv
 requests
 fastapi
