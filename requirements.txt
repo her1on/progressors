@@ -1,6 +1,6 @@
-streamlit
 gigachat
 python-dotenv
 requests
 fastapi
 uvicorn[standard]
+aiogram==3.7.0
