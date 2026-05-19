@@ -14,7 +14,10 @@ from aiogram.types import (
     CallbackQuery,
     InlineKeyboardButton,
     InlineKeyboardMarkup,
+    KeyboardButton,
     Message,
+    ReplyKeyboardMarkup,
+    ReplyKeyboardRemove,
 )
 from dotenv import load_dotenv
 
@@ -65,6 +68,16 @@ class Form(StatesGroup):
 
 
 # ── Keyboards ─────────────────────────────────────────────────────────────────
+
+def kb_menu():
+    return ReplyKeyboardMarkup(
+        keyboard=[
+            [KeyboardButton(text="🚀 Новый маршрут"), KeyboardButton(text="❓ Помощь")],
+        ],
+        resize_keyboard=True,
+        persistent=True,
+    )
+
 
 def kb_hours():
     return InlineKeyboardMarkup(inline_keyboard=[[
@@ -247,11 +260,13 @@ async def cmd_start(message: Message, state: FSMContext):
         "на русском языке, подобранными под твой уровень и цели.\n\n"
         "Скажи мне — *чему хочешь научиться?*\n"
         "_Например: Python, UX-дизайн, маркетинг, сварка, английский язык_",
+        reply_markup=kb_menu(),
     )
     await state.set_state(Form.goal)
 
 
 @dp.message(Command("help"))
+@dp.message(F.text == "❓ Помощь")
 async def cmd_help(message: Message):
     await message.answer(
         "*Прогрессоры* — ИИ-навигатор по обучению\n\n"
@@ -269,7 +284,13 @@ async def cmd_help(message: Message):
         "😕 Попросить упростить материал\n"
         "👎 Получить альтернативные ресурсы\n"
         "➡️ Пропустить и перейти дальше",
+        reply_markup=kb_menu(),
     )
+
+
+@dp.message(F.text == "🚀 Новый маршрут")
+async def menu_new_route(message: Message, state: FSMContext):
+    await cmd_start(message, state)
 
 
 @dp.message(Command("cancel"))
@@ -466,6 +487,7 @@ async def _send_stage(message: Message, state: FSMContext, idx: int):
             "Хочешь построить новый маршрут?",
             reply_markup=kb_restart(),
         )
+        await message.answer("Используй кнопки ниже или введи новую цель:", reply_markup=kb_menu())
         return
 
     stage = stages[idx]
