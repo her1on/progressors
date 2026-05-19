@@ -95,7 +95,7 @@ async def _validate_goal(goal: str) -> tuple[str, str]:
         raw = await asyncio.to_thread(call_gigachat, validate_prompt(goal))
         logger.warning(f"[VALIDATE] goal={goal!r} raw={raw!r}")
         lines = raw.strip().splitlines()
-        first = lines[0].strip()
+        first = lines[0].strip().upper()
         explanation = lines[1].strip() if len(lines) > 1 else ""
         if "НЕРЕАЛИСТИЧНО" in first:
             return "unrealistic", explanation or "Цель физически невозможна."
