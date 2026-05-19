@@ -123,6 +123,8 @@ class Form(StatesGroup):
     goal = State()
     hours = State()
     months = State()
+    motivation = State()
+    format_pref = State()
     quiz = State()
     track = State()
 
@@ -162,6 +164,27 @@ def kb_quiz():
     return InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text=f"{k}  {v}", callback_data=f"q_{k}")]
         for k, v in QUIZ_OPTIONS
+    ])
+
+
+def kb_motivation():
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="🚀 Новая профессия", callback_data="mot_career")],
+        [InlineKeyboardButton(text="💼 Текущая работа", callback_data="mot_work")],
+        [InlineKeyboardButton(text="📚 Личное обучение", callback_data="mot_personal")],
+    ])
+
+
+def kb_format():
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [
+            InlineKeyboardButton(text="🎥 Видео", callback_data="fmt_video"),
+            InlineKeyboardButton(text="📄 Статьи", callback_data="fmt_articles"),
+        ],
+        [
+            InlineKeyboardButton(text="🎓 Курсы", callback_data="fmt_courses"),
+            InlineKeyboardButton(text="🔀 Всё равно", callback_data="fmt_any"),
+        ],
     ])
 
 
@@ -447,10 +470,50 @@ async def got_hours(callback: CallbackQuery, state: FSMContext):
     await callback.answer()
 
 
+MOTIVATION_LABELS = {
+    "mot_career":   "Новая профессия",
+    "mot_work":     "Текущая работа",
+    "mot_personal": "Личное обучение",
+}
+
+FORMAT_LABELS = {
+    "fmt_video":    "Видео",
+    "fmt_articles": "Статьи",
+    "fmt_courses":  "Курсы",
+    "fmt_any":      "Любой формат",
+}
+
+
 @dp.callback_query(Form.months, F.data.startswith("m_"))
 async def got_months(callback: CallbackQuery, state: FSMContext):
     months = int(callback.data.split("_")[1])
     await state.update_data(months=months)
+    await callback.message.edit_reply_markup(reply_markup=None)
+    await callback.message.answer(
+        "🎯 *Зачем хочешь это изучить?*",
+        reply_markup=kb_motivation(),
+    )
+    await state.set_state(Form.motivation)
+    await callback.answer()
+
+
+@dp.callback_query(Form.motivation, F.data.startswith("mot_"))
+async def got_motivation(callback: CallbackQuery, state: FSMContext):
+    motivation = MOTIVATION_LABELS[callback.data]
+    await state.update_data(motivation=motivation)
+    await callback.message.edit_reply_markup(reply_markup=None)
+    await callback.message.answer(
+        "📚 *Какой формат материалов предпочитаешь?*",
+        reply_markup=kb_format(),
+    )
+    await state.set_state(Form.format_pref)
+    await callback.answer()
+
+
+@dp.callback_query(Form.format_pref, F.data.startswith("fmt_"))
+async def got_format(callback: CallbackQuery, state: FSMContext):
+    format_pref = FORMAT_LABELS[callback.data]
+    await state.update_data(format_pref=format_pref)
     data = await state.get_data()
     await callback.message.edit_reply_markup(reply_markup=None)
 
@@ -531,16 +594,26 @@ async def got_answer(callback: CallbackQuery, state: FSMContext):
         months=data["months"],
         weeks=weeks,
         qa_text=qa_text,
+        motivation=data.get("motivation", ""),
+        format_pref=data.get("format_pref", ""),
     )
     track_task = asyncio.create_task(_fetch_track(prompt))
     _track_tasks[callback.from_user.id] = track_task
 
+    motivation = data.get("motivation", "")
+    format_pref = data.get("format_pref", "")
+    mot_emoji = {"Новая профессия": "🚀", "Текущая работа": "💼", "Личное обучение": "📚"}.get(motivation, "🎯")
+    fmt_emoji = {"Видео": "🎥", "Статьи": "📄", "Курсы": "🎓", "Любой формат": "🔀"}.get(format_pref, "📚")
+
     await callback.message.answer(
-        f"🎯 *Уровень определён*\n\n"
-        f"*{level}*\n_{level_desc}_\n\n"
-        f"📌 Цель: *{escape_md(data['goal'])}*\n"
-        f"⏱ {data['hours']} ч/нед · {data['months']} мес\n\n"
-        f"Готов к персональному треку?",
+        f"👤 *Твой профиль готов*\n\n"
+        f"📌 *Цель:* {escape_md(data['goal'])}\n"
+        f"📊 *Уровень:* {level}\n"
+        f"_{level_desc}_\n\n"
+        f"{mot_emoji} *Мотивация:* {motivation}\n"
+        f"{fmt_emoji} *Формат:* {format_pref}\n"
+        f"⏱ *Время:* {data['hours']} ч/нед · {data['months']} мес\n\n"
+        f"Строим персональный трек!",
         reply_markup=kb_build(),
     )
 
@@ -569,6 +642,8 @@ async def build_track(callback: CallbackQuery, state: FSMContext):
                     months=data["months"],
                     weeks=weeks,
                     qa_text=data["qa_text"],
+                    motivation=data.get("motivation", ""),
+                    format_pref=data.get("format_pref", ""),
                 )
                 task = asyncio.create_task(_fetch_track(prompt))
             stages = await task
