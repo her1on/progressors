@@ -741,13 +741,15 @@ if __name__ == "__main__":
     dp.shutdown.register(on_shutdown)
 
     async def health(request):
-        logger.warning("[HEALTH] health check called")
-        goal = request.rel_url.query.get("goal", "стать космонавтом")
-        try:
-            raw = await asyncio.to_thread(call_gigachat, validate_prompt(goal))
-            return web.Response(text=f"goal={goal!r}\nraw={raw!r}\n")
-        except Exception as e:
-            return web.Response(text=f"goal={goal!r}\nERROR={e!r}\n", status=500)
+        info = await bot.get_webhook_info()
+        token_tail = BOT_TOKEN[-6:] if BOT_TOKEN else "NONE"
+        return web.Response(text=(
+            f"token_tail=...{token_tail}\n"
+            f"webhook_url={info.url!r}\n"
+            f"pending_updates={info.pending_update_count}\n"
+            f"last_error={info.last_error_message!r}\n"
+            f"last_error_date={info.last_error_date}\n"
+        ))
 
     app = web.Application()
     app.router.add_get("/health", health)
