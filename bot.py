@@ -667,8 +667,7 @@ async def _resolve_stepik_links(text: str) -> str:
     stepik_pattern = re.compile(r"\[Stepik: ([^\]]+)\]\((https://stepik\.org/search\?query=[^)]+)\)")
     for title, search_url in stepik_pattern.findall(text):
         try:
-            # budget=999999 — ищем любой курс, не фильтруем по цене
-            courses = await asyncio.to_thread(search_stepik_courses, title, 999999, 1)
+            courses = await asyncio.to_thread(search_stepik_courses, title, 0, 1)
             if courses:
                 direct_url = courses[0]["url"]
                 text = text.replace(search_url, direct_url)
