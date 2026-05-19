@@ -726,27 +726,30 @@ async def _send_stage(message: Message, state: FSMContext, idx: int):
     text = await _resolve_youtube_links(text)
     text = await _resolve_stepik_links(text)
 
-    try:
-        courses = await asyncio.to_thread(search_stepik_courses, data.get("goal", stage["title"]), 0, 3)
-        if courses:
-            lines = ["\n📚 *Курсы на Stepik по этому этапу:*\n"]
-            for c in courses:
-                lines.append(f"• [{c['title']}]({c['url']})")
-            stepik_block = "\n".join(lines)
-            combined = text + stepik_block
-            if len(combined) <= 4000:
-                text = combined
-    except Exception:
-        pass
+    format_pref = data.get("format_pref", "")
+    if format_pref in ("Курсы", "Любой формат", ""):
+        try:
+            courses = await asyncio.to_thread(search_stepik_courses, data.get("goal", stage["title"]), 0, 3)
+            if courses:
+                lines = ["\n📚 *Курсы на Stepik по этому этапу:*\n"]
+                for c in courses:
+                    lines.append(f"• [{c['title']}]({c['url']})")
+                stepik_block = "\n".join(lines)
+                combined = text + stepik_block
+                if len(combined) <= 4000:
+                    text = combined
+        except Exception:
+            pass
 
     try:
-        await message.answer(text[:4000], reply_markup=kb_stage(idx, is_last))
+        await message.answer(text[:4000], reply_markup=kb_stage(idx, is_last), disable_web_page_preview=True)
     except Exception as e:
         logger.warning(f"Markdown send failed for stage {idx}, retrying as plain text: {e}")
         await message.answer(
             re.sub(r"[*_`\[\]]", "", text[:4000]),
             parse_mode=None,
             reply_markup=kb_stage(idx, is_last),
+            disable_web_page_preview=True,
         )
 
 
