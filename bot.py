@@ -240,20 +240,34 @@ _SOURCE_SEARCH = {
 
 def linkify_materials(text: str) -> str:
     """Превращает [YouTube] Название — Канал в кликабельную ссылку на поиск."""
-    def replace(m: re.Match) -> str:
-        source = m.group(1).strip()
-        rest   = m.group(2).strip()
-        # Берём только название до " — " (убираем имя канала)
-        title = rest.split(" — ")[0].strip()
-        # Убираем пометки вроде (бесплатно)
+    def make_link(source: str, title: str) -> str:
         title = re.sub(r"\s*\([^)]*\)\s*$", "", title).strip()
+        title = title.strip('"\'*')
         base = _SOURCE_SEARCH.get(source.lower())
         if not base or not title:
-            return m.group(0)
+            return None
         url = base.format(urllib.parse.quote_plus(title))
         return f"[{source}: {title}]({url})"
 
-    return re.sub(r"\[([^\]\n]+)\]\s+([^\n]+)", replace, text)
+    def replace_bracket(m: re.Match) -> str:
+        source = m.group(1).strip()
+        rest = m.group(2).strip().split(" — ")[0].strip()
+        link = make_link(source, rest)
+        return link if link else m.group(0)
+
+    def replace_colon(m: re.Match) -> str:
+        source = m.group(1).strip()
+        rest = re.sub(r"\*+", "", m.group(2)).strip().split(" — ")[0].strip()
+        rest = rest.strip('"\'')
+        link = make_link(source, rest)
+        return link if link else m.group(0)
+
+    # Формат [Source] Name
+    text = re.sub(r"\[([^\]\n]+)\]\s+([^\n]+)", replace_bracket, text)
+    # Формат Source: **"Name"** (запасной вариант если модель нарушила формат)
+    sources = "|".join(re.escape(k.title()) for k in _SOURCE_SEARCH)
+    text = re.sub(rf"({sources}):\s+(\*{{0,2}}[^\n]+)", replace_colon, text)
+    return text
 
 
 def calc_level(answers: list[str]) -> str:
@@ -660,19 +674,6 @@ async def build_track(callback: CallbackQuery, state: FSMContext):
 
     await state.update_data(stages=stages, current_stage=0, completed=[])
     await state.set_state(Form.track)
-
-    data = await state.get_data()
-    try:
-        courses = await asyncio.to_thread(search_stepik_courses, data["goal"], 0, 5)
-        if courses:
-            lines = ["📚 *Курсы на Stepik по твоей теме:*\n"]
-            for c in courses:
-                price_text = "бесплатно" if c["price"] == 0 else f"{c['price']} ₽"
-                lines.append(f"• [{escape_md(c['title'])}]({c['url']}) — {price_text}")
-            await callback.message.answer("\n".join(lines))
-    except Exception:
-        pass
-
     await _send_stage(callback.message, state, 0)
 
 
@@ -711,6 +712,18 @@ async def _send_stage(message: Message, state: FSMContext, idx: int):
     stage = stages[idx]
     is_last = idx == len(stages) - 1
     text = await _resolve_stepik_links(format_stage(stage, idx, len(stages)))
+
+    try:
+        courses = await asyncio.to_thread(search_stepik_courses, stage["title"], 0, 3)
+        if courses:
+            lines = ["\n📚 *Курсы на Stepik:*"]
+            for c in courses:
+                price_text = "бесплатно" if c["price"] == 0 else f"{c['price']} ₽"
+                lines.append(f"• [{escape_md(c['title'])}]({c['url']}) — {price_text}")
+            text = (text + "\n".join(lines))[:4000]
+    except Exception:
+        pass
+
     try:
         await message.answer(text, reply_markup=kb_stage(idx, is_last))
     except Exception as e:
