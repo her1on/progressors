@@ -678,18 +678,22 @@ async def build_track(callback: CallbackQuery, state: FSMContext):
     await _send_stage(callback.message, state, 0)
 
 
-async def _resolve_youtube_links(text: str, used_ids: set[str]) -> str:
+async def _resolve_youtube_links(text: str, used_ids: set[str], max_videos: int = 2) -> str:
     """Replace YouTube search URLs with direct video URLs via API, skipping already-used video IDs."""
     pattern = re.compile(
         r"\[YouTube: ([^\]]+)\]\((https://www\.youtube\.com/results\?search_query=[^)]+)\)"
     )
+    resolved = 0
     for title, search_url in pattern.findall(text):
+        if resolved >= max_videos:
+            break
         try:
             result = await asyncio.to_thread(search_youtube_video, title, used_ids)
             if result:
                 video_url, video_id = result
                 used_ids.add(video_id)
                 text = text.replace(search_url, video_url)
+                resolved += 1
         except Exception:
             pass
     return text
