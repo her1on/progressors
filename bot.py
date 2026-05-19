@@ -831,7 +831,11 @@ async def stage_hard(callback: CallbackQuery, state: FSMContext):
     stages[idx]["materials"] = ""
     await state.update_data(stages=stages)
     await msg.delete()
-    await _send_stage(callback.message, state, idx)
+    try:
+        await _send_stage(callback.message, state, idx)
+    except Exception as e:
+        logger.error(f"stage_hard _send_stage failed: {e}")
+        await callback.message.answer("❌ Не удалось обновить этап. Попробуй ещё раз.")
 
 
 @dp.callback_query(Form.track, F.data.startswith("easy_"))
@@ -855,7 +859,11 @@ async def stage_easy(callback: CallbackQuery, state: FSMContext):
     stages[idx]["materials"] = ""
     await state.update_data(stages=stages)
     await msg.delete()
-    await _send_stage(callback.message, state, idx)
+    try:
+        await _send_stage(callback.message, state, idx)
+    except Exception as e:
+        logger.error(f"stage_easy _send_stage failed: {e}")
+        await callback.message.answer("❌ Не удалось обновить этап. Попробуй ещё раз.")
 
 
 @dp.callback_query(Form.track, F.data.startswith("bad_"))
@@ -878,7 +886,11 @@ async def stage_bad(callback: CallbackQuery, state: FSMContext):
     stages[idx]["materials"] = result.strip()
     await state.update_data(stages=stages)
     await msg.delete()
-    await _send_stage(callback.message, state, idx)
+    try:
+        await _send_stage(callback.message, state, idx)
+    except Exception as e:
+        logger.error(f"stage_bad _send_stage failed: {e}")
+        await callback.message.answer("❌ Не удалось обновить этап. Попробуй ещё раз.")
 
 
 @dp.callback_query(F.data == "restart")
