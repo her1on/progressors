@@ -55,6 +55,25 @@ QUIZ_OPTIONS = [
     ("D", "Занимаюсь на продвинутом уровне"),
 ]
 
+# Хранилище фоновых задач генерации вопросов (user_id → asyncio.Task)
+_questions_tasks: dict[int, asyncio.Task] = {}
+
+
+async def _fetch_questions(goal: str) -> list[dict]:
+    try:
+        raw = await asyncio.to_thread(call_gigachat, questions_prompt(goal))
+        questions = parse_questions(raw)
+        if questions:
+            return questions
+    except Exception:
+        pass
+    return [
+        {"question": f"Насколько ты знаком с основами темы «{goal}»?"},
+        {"question": f"Как часто ты практикуешь навыки по теме «{goal}»?"},
+        {"question": f"В какой мере ты применял «{goal}» на практике?"},
+        {"question": f"Насколько ты знаком с продвинутыми аспектами «{goal}»?"},
+    ]
+
 
 # ── FSM States ────────────────────────────────────────────────────────────────
 
@@ -62,7 +81,6 @@ class Form(StatesGroup):
     goal = State()
     hours = State()
     months = State()
-    budget = State()
     quiz = State()
     track = State()
 
@@ -96,18 +114,6 @@ def kb_months():
         InlineKeyboardButton(text="12 мес", callback_data="m_12"),
     ]])
 
-
-def kb_budget():
-    return InlineKeyboardMarkup(inline_keyboard=[
-        [
-            InlineKeyboardButton(text="0 руб (бесплатно)", callback_data="b_0"),
-            InlineKeyboardButton(text="до 1 000 руб", callback_data="b_1000"),
-        ],
-        [
-            InlineKeyboardButton(text="до 3 000 руб", callback_data="b_3000"),
-            InlineKeyboardButton(text="5 000+ руб", callback_data="b_5000"),
-        ],
-    ])
 
 
 def kb_quiz():
@@ -253,6 +259,7 @@ def format_stage(stage: dict, idx: int, total: int) -> str:
 
 @dp.message(CommandStart())
 async def cmd_start(message: Message, state: FSMContext):
+    _questions_tasks.pop(message.from_user.id, None)
     await state.clear()
     await message.answer(
         "🪐 *Прогрессоры* — твой ИИ-навигатор по обучению\n\n"
@@ -299,6 +306,7 @@ async def cmd_cancel(message: Message, state: FSMContext):
     if current is None:
         await message.answer("Нечего отменять. Введи /start чтобы начать.")
         return
+    _questions_tasks.pop(message.from_user.id, None)
     await state.clear()
     await message.answer(
         "❌ Сброшено. Введи /start чтобы начать заново.",
@@ -314,7 +322,12 @@ async def got_goal(message: Message, state: FSMContext):
         )
         return
 
-    await state.update_data(goal=goal)
+    # Запускаем генерацию вопросов фоново, пока пользователь выбирает часы и месяцы
+    questions_task = asyncio.create_task(_fetch_questions(goal))
+    await state.update_data(goal=goal, questions_task=None)
+    # Храним task в глобальном словаре (FSM не сериализует asyncio.Task)
+    _questions_tasks[message.from_user.id] = questions_task
+
     await message.answer(
         f"Отлично! Цель: *{escape_md(goal)}*\n\nСколько часов в неделю готов уделять учёбе?",
         reply_markup=kb_hours(),
@@ -339,43 +352,25 @@ async def got_hours(callback: CallbackQuery, state: FSMContext):
 async def got_months(callback: CallbackQuery, state: FSMContext):
     months = int(callback.data.split("_")[1])
     await state.update_data(months=months)
-    await callback.message.edit_reply_markup(reply_markup=None)
-    await callback.message.answer(
-        f"📅 *{months} мес* — отлично!\n\nКакой месячный бюджет на обучение?",
-        reply_markup=kb_budget(),
-    )
-    await state.set_state(Form.budget)
-    await callback.answer()
-
-
-@dp.callback_query(Form.budget, F.data.startswith("b_"))
-async def got_budget(callback: CallbackQuery, state: FSMContext):
-    budget = int(callback.data.split("_")[1])
-    await state.update_data(budget=budget)
     data = await state.get_data()
     await callback.message.edit_reply_markup(reply_markup=None)
 
-    budget_label = "бесплатно" if budget == 0 else f"до {budget:,} руб/мес".replace(",", " ")
-    await callback.message.answer(
-        f"💰 *{budget_label}* — принято!\n\n⏳ Генерирую вопросы для диагностики...",
-    )
+    user_id = callback.from_user.id
+    task = _questions_tasks.pop(user_id, None)
 
-    msg = await callback.message.answer("...")
-    try:
-        raw = await asyncio.to_thread(call_gigachat, questions_prompt(data["goal"]))
-        questions = parse_questions(raw)
-        if not questions:
-            raise ValueError("empty")
-    except Exception:
-        questions = [
-            {"question": f"Насколько ты знаком с основами темы «{data['goal']}»?"},
-            {"question": f"Как часто ты практикуешь навыки по теме «{data['goal']}»?"},
-            {"question": f"В какой мере ты применял «{data['goal']}» на практике?"},
-            {"question": f"Насколько ты знаком с продвинутыми аспектами «{data['goal']}»?"},
-        ]
+    if task and not task.done():
+        msg = await callback.message.answer("⏳ Готовлю вопросы для диагностики...")
+        questions = await task
+        await msg.delete()
+    elif task and task.done():
+        questions = task.result()
+    else:
+        # Задача не найдена — генерируем синхронно
+        msg = await callback.message.answer("⏳ Готовлю вопросы для диагностики...")
+        questions = await _fetch_questions(data["goal"])
+        await msg.delete()
 
     await state.update_data(questions=questions, current_q=0, answers=[])
-    await msg.delete()
     await _send_question(callback.message, state)
     await state.set_state(Form.quiz)
     await callback.answer()
@@ -427,13 +422,11 @@ async def got_answer(callback: CallbackQuery, state: FSMContext):
 
     await state.update_data(level=level, qa_text=qa_text)
 
-    budget = data.get("budget", 0)
-    budget_label = "бесплатно" if budget == 0 else f"до {budget:,} руб/мес".replace(",", " ")
     await callback.message.answer(
         f"🎯 *Уровень определён*\n\n"
         f"*{level}*\n_{level_desc}_\n\n"
         f"📌 Цель: *{escape_md(data['goal'])}*\n"
-        f"⏱ {data['hours']} ч/нед · {data['months']} мес · {budget_label}\n\n"
+        f"⏱ {data['hours']} ч/нед · {data['months']} мес\n\n"
         f"Готов к персональному треку?",
         reply_markup=kb_build(),
     )
@@ -452,7 +445,6 @@ async def build_track(callback: CallbackQuery, state: FSMContext):
         hours=data["hours"],
         months=data["months"],
         weeks=weeks,
-        budget=data.get("budget", 0),
         qa_text=data["qa_text"],
     )
 
