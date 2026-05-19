@@ -695,7 +695,7 @@ async def _send_stage(message: Message, state: FSMContext, idx: int):
     text = await _resolve_stepik_links(format_stage(stage, idx, len(stages)))
 
     try:
-        courses = await asyncio.to_thread(search_stepik_courses, stage["title"], 0, 3)
+        courses = await asyncio.to_thread(search_stepik_courses, data.get("goal", stage["title"]), 0, 3)
         if courses:
             lines = ["\n📚 *Курсы на Stepik по этому этапу:*\n"]
             for c in courses:
