@@ -82,10 +82,10 @@ async def _fetch_questions(goal: str) -> list[dict]:
     except Exception as e:
         logger.error(f"_fetch_questions failed for goal='{goal}': {e}")
     return [
-        {"question": f"Насколько ты знаком с основами темы «{goal}»?"},
-        {"question": f"Как часто ты практикуешь навыки по теме «{goal}»?"},
-        {"question": f"В какой мере ты применял «{goal}» на практике?"},
-        {"question": f"Насколько ты знаком с продвинутыми аспектами «{goal}»?"},
+        {"question": "Насколько ты знаком с этой темой в теории?"},
+        {"question": "Как часто ты практикуешь навыки по этой теме?"},
+        {"question": "В какой мере ты применял эти знания на практике?"},
+        {"question": "Насколько ты знаком с продвинутыми аспектами этой темы?"},
     ]
 
 
