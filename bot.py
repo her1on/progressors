@@ -677,15 +677,17 @@ async def build_track(callback: CallbackQuery, state: FSMContext):
     await _send_stage(callback.message, state, 0)
 
 
-async def _resolve_youtube_links(text: str) -> str:
-    """Replace YouTube search URLs with direct video URLs via API."""
+async def _resolve_youtube_links(text: str, used_ids: set[str]) -> str:
+    """Replace YouTube search URLs with direct video URLs via API, skipping already-used video IDs."""
     pattern = re.compile(
         r"\[YouTube: ([^\]]+)\]\((https://www\.youtube\.com/results\?search_query=[^)]+)\)"
     )
     for title, search_url in pattern.findall(text):
         try:
-            video_url = await asyncio.to_thread(search_youtube_video, title)
-            if video_url:
+            result = await asyncio.to_thread(search_youtube_video, title, used_ids)
+            if result:
+                video_url, video_id = result
+                used_ids.add(video_id)
                 text = text.replace(search_url, video_url)
         except Exception:
             pass
@@ -722,8 +724,10 @@ async def _send_stage(message: Message, state: FSMContext, idx: int):
 
     stage = stages[idx]
     is_last = idx == len(stages) - 1
+    used_ids: set[str] = set(data.get("used_video_ids", []))
     text = format_stage(stage, idx, len(stages))
-    text = await _resolve_youtube_links(text)
+    text = await _resolve_youtube_links(text, used_ids)
+    await state.update_data(used_video_ids=list(used_ids))
     text = await _resolve_stepik_links(text)
 
     format_pref = data.get("format_pref", "")

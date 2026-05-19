@@ -12,8 +12,8 @@ def _get_key() -> str | None:
     return _API_KEY
 
 
-def search_youtube_video(query: str) -> str | None:
-    """Returns direct YouTube video URL for the top result, or None on failure."""
+def search_youtube_video(query: str, exclude_ids: set[str] | None = None) -> tuple[str, str] | None:
+    """Returns (video_url, video_id) for the top non-excluded result, or None on failure."""
     key = _get_key()
     if not key:
         return None
@@ -23,14 +23,16 @@ def search_youtube_video(query: str) -> str | None:
             "q": query,
             "part": "snippet",
             "type": "video",
-            "maxResults": 1,
+            "maxResults": 5,
             "relevanceLanguage": "ru",
         }, timeout=10)
         resp.raise_for_status()
         items = resp.json().get("items", [])
-        if items:
-            video_id = items[0]["id"]["videoId"]
-            return f"https://www.youtube.com/watch?v={video_id}"
+        for item in items:
+            video_id = item["id"]["videoId"]
+            if exclude_ids and video_id in exclude_ids:
+                continue
+            return f"https://www.youtube.com/watch?v={video_id}", video_id
     except Exception:
         pass
     return None
