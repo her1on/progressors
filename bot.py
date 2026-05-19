@@ -251,7 +251,8 @@ def linkify_materials(text: str) -> str:
         base = _SOURCE_SEARCH.get(source.lower())
         if not base or not title:
             return m.group(0)
-        url = base.format(urllib.parse.quote_plus(title))
+        query = " ".join(title.split()[:4]) if source.lower() == "habr" else title
+        url = base.format(urllib.parse.quote_plus(query))
         return f"[{source}: {title}]({url})"
 
     return re.sub(r"\[([^\]\n]+)\]\s+([^\n\[]+)", replace, text)
@@ -712,8 +713,7 @@ async def _send_stage(message: Message, state: FSMContext, idx: int):
         if courses:
             lines = ["\n📚 *Курсы на Stepik по этому этапу:*\n"]
             for c in courses:
-                price_text = "бесплатно" if c["price"] == 0 else f"{c['price']} ₽"
-                lines.append(f"• [{c['title']}]({c['url']}) — {price_text}")
+                lines.append(f"• [{c['title']}]({c['url']})")
             stepik_block = "\n".join(lines)
             combined = text + stepik_block
             if len(combined) <= 4000:
