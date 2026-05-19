@@ -20,7 +20,6 @@ from aiogram.types import (
     LinkPreviewOptions,
     Message,
     ReplyKeyboardMarkup,
-    ReplyKeyboardRemove,
 )
 from dotenv import load_dotenv
 
@@ -232,7 +231,7 @@ def kb_restart():
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
 def escape_md(text: str) -> str:
-    for ch in r"*_`[":
+    for ch in r"*_`[()":
         text = text.replace(ch, f"\\{ch}")
     return text
 
@@ -348,7 +347,7 @@ def parse_track(text: str) -> tuple[list[dict], str]:
 
 
 def _remove_stepik_lines(text: str) -> str:
-    lines = [l for l in text.split("\n") if not re.search(r"\[Stepik\]", l, re.IGNORECASE)]
+    lines = [line for line in text.split("\n") if not re.search(r"\[Stepik\]", line, re.IGNORECASE)]
     return "\n".join(lines).strip()
 
 
@@ -401,10 +400,16 @@ def format_stage(stage: dict, idx: int, total: int) -> str:
 
 # ── Handlers ──────────────────────────────────────────────────────────────────
 
+def _cancel_user_tasks(user_id: int) -> None:
+    for store in (_questions_tasks, _track_tasks):
+        task = store.pop(user_id, None)
+        if task and not task.done():
+            task.cancel()
+
+
 @dp.message(CommandStart())
 async def cmd_start(message: Message, state: FSMContext):
-    _questions_tasks.pop(message.from_user.id, None)
-    _track_tasks.pop(message.from_user.id, None)
+    _cancel_user_tasks(message.from_user.id)
     await state.clear()
     await message.answer(
         "🪐 *Прогрессоры* — твой ИИ-навигатор по обучению\n\n"
@@ -452,8 +457,7 @@ async def cmd_cancel(message: Message, state: FSMContext):
     if current is None:
         await message.answer("Нечего отменять. Введи /start чтобы начать.")
         return
-    _questions_tasks.pop(message.from_user.id, None)
-    _track_tasks.pop(message.from_user.id, None)
+    _cancel_user_tasks(message.from_user.id)
     await state.clear()
     await message.answer(
         "❌ Сброшено. Введи /start чтобы начать заново.",
@@ -706,6 +710,8 @@ async def build_track(callback: CallbackQuery, state: FSMContext):
     typing_task = asyncio.create_task(_typing_loop(callback.message.chat.id, stop))
     try:
         if task and task.done():
+            if task.exception():
+                raise task.exception()
             stages, summary = task.result()
         else:
             if not task:
@@ -983,7 +989,10 @@ async def restart(callback: CallbackQuery, state: FSMContext):
 # ── Entry point (webhook) ─────────────────────────────────────────────────────
 
 WEBHOOK_PATH = "/webhook"
-WEBHOOK_SECRET = os.getenv("WEBHOOK_SECRET", "progressors-secret-2026")
+WEBHOOK_SECRET = os.getenv("WEBHOOK_SECRET")
+if not WEBHOOK_SECRET:
+    logger.warning("WEBHOOK_SECRET not set, using insecure default")
+    WEBHOOK_SECRET = "progressors-secret-2026"
 
 
 async def on_startup(bot: Bot) -> None:
