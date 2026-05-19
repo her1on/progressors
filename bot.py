@@ -335,6 +335,11 @@ def parse_track(text: str) -> list[dict]:
     return stages
 
 
+def _remove_stepik_lines(text: str) -> str:
+    lines = [l for l in text.split("\n") if not re.search(r"\[Stepik\]", l, re.IGNORECASE)]
+    return "\n".join(lines).strip()
+
+
 def format_stage(stage: dict, idx: int, total: int) -> str:
     text = (
         f"🪐 *Этап {idx + 1} из {total}: {stage['title']}*\n"
@@ -343,7 +348,9 @@ def format_stage(stage: dict, idx: int, total: int) -> str:
     if stage.get("topics"):
         text += f"*Что изучать:*\n{stage['topics']}\n\n"
     if stage.get("materials"):
-        text += f"*Материалы:*\n{linkify_materials(stage['materials'])}\n\n"
+        materials = _remove_stepik_lines(stage["materials"])
+        if materials:
+            text += f"*Материалы:*\n{linkify_materials(materials)}\n\n"
     if stage.get("outcome"):
         text += f"✨ *Результат:* _{stage['outcome']}_"
     return text[:4000]
