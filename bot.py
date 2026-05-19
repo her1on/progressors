@@ -809,13 +809,14 @@ async def stage_hard(callback: CallbackQuery, state: FSMContext):
     prompt = simplify_prompt(data["goal"], data["level"], stage["title"], stage["topics"])
     try:
         result = await asyncio.to_thread(call_gigachat, prompt)
-        stages[idx]["topics"] = result.strip()
-        stages[idx]["materials"] = ""
-        await state.update_data(stages=stages)
-        await msg.delete()
-        await _send_stage(callback.message, state, idx)
     except Exception:
         await msg.edit_text("❌ Не удалось адаптировать. Попробуй перейти к следующему этапу.")
+        return
+    stages[idx]["topics"] = result.strip()
+    stages[idx]["materials"] = ""
+    await state.update_data(stages=stages)
+    await msg.delete()
+    await _send_stage(callback.message, state, idx)
 
 
 @dp.callback_query(Form.track, F.data.startswith("easy_"))
@@ -832,13 +833,14 @@ async def stage_easy(callback: CallbackQuery, state: FSMContext):
     prompt = advance_prompt(data["goal"], data["level"], stage["title"], stage["topics"])
     try:
         result = await asyncio.to_thread(call_gigachat, prompt)
-        stages[idx]["topics"] = result.strip()
-        stages[idx]["materials"] = ""
-        await state.update_data(stages=stages)
-        await msg.delete()
-        await _send_stage(callback.message, state, idx)
     except Exception:
         await msg.edit_text("❌ Не удалось усложнить. Попробуй перейти к следующему этапу.")
+        return
+    stages[idx]["topics"] = result.strip()
+    stages[idx]["materials"] = ""
+    await state.update_data(stages=stages)
+    await msg.delete()
+    await _send_stage(callback.message, state, idx)
 
 
 @dp.callback_query(Form.track, F.data.startswith("bad_"))
@@ -855,12 +857,13 @@ async def stage_bad(callback: CallbackQuery, state: FSMContext):
     prompt = alternative_prompt(data["goal"], data["level"], stage["title"], stage["topics"])
     try:
         result = await asyncio.to_thread(call_gigachat, prompt)
-        stages[idx]["materials"] = result.strip()
-        await state.update_data(stages=stages)
-        await msg.delete()
-        await _send_stage(callback.message, state, idx)
     except Exception:
         await msg.edit_text("❌ Не удалось подобрать альтернативу.")
+        return
+    stages[idx]["materials"] = result.strip()
+    await state.update_data(stages=stages)
+    await msg.delete()
+    await _send_stage(callback.message, state, idx)
 
 
 @dp.callback_query(F.data == "restart")
