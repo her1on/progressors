@@ -742,7 +742,12 @@ if __name__ == "__main__":
 
     async def health(request):
         logger.warning("[HEALTH] health check called")
-        return web.Response(text="OK")
+        goal = request.rel_url.query.get("goal", "стать космонавтом")
+        try:
+            raw = await asyncio.to_thread(call_gigachat, validate_prompt(goal))
+            return web.Response(text=f"goal={goal!r}\nraw={raw!r}\n")
+        except Exception as e:
+            return web.Response(text=f"goal={goal!r}\nERROR={e!r}\n", status=500)
 
     app = web.Application()
     app.router.add_get("/health", health)
