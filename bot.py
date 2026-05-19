@@ -173,28 +173,28 @@ def kb_quiz():
 
 def kb_motivation():
     return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="🚀 Новая профессия", callback_data="mot_career")],
-        [InlineKeyboardButton(text="💼 Текущая работа", callback_data="mot_work")],
-        [InlineKeyboardButton(text="📚 Личное обучение", callback_data="mot_personal")],
+        [InlineKeyboardButton(text="Новая профессия", callback_data="mot_career")],
+        [InlineKeyboardButton(text="Текущая работа", callback_data="mot_work")],
+        [InlineKeyboardButton(text="Личное обучение", callback_data="mot_personal")],
     ])
 
 
 def kb_format():
     return InlineKeyboardMarkup(inline_keyboard=[
         [
-            InlineKeyboardButton(text="🎥 Видео", callback_data="fmt_video"),
-            InlineKeyboardButton(text="📄 Статьи", callback_data="fmt_articles"),
+            InlineKeyboardButton(text="Видео", callback_data="fmt_video"),
+            InlineKeyboardButton(text="Статьи", callback_data="fmt_articles"),
         ],
         [
-            InlineKeyboardButton(text="🎓 Курсы", callback_data="fmt_courses"),
-            InlineKeyboardButton(text="🔀 Всё равно", callback_data="fmt_any"),
+            InlineKeyboardButton(text="Курсы", callback_data="fmt_courses"),
+            InlineKeyboardButton(text="Любой формат", callback_data="fmt_any"),
         ],
     ])
 
 
 def kb_build():
     return InlineKeyboardMarkup(inline_keyboard=[[
-        InlineKeyboardButton(text="🚀 Построить трек", callback_data="build_track"),
+        InlineKeyboardButton(text="Построить трек", callback_data="build_track"),
     ]])
 
 
@@ -346,6 +346,17 @@ def _remove_stepik_lines(text: str) -> str:
     return "\n".join(lines).strip()
 
 
+def _split_llm_response(text: str) -> tuple[str, str]:
+    """Split free-text LLM response into (topics, materials) by detecting source bracket lines."""
+    topic_lines, material_lines = [], []
+    for line in text.split("\n"):
+        if re.match(r"^\s*[-*•]?\s*\[(YouTube|Stepik|Habr|Rutube|VK)", line, re.IGNORECASE):
+            material_lines.append(line.strip())
+        else:
+            topic_lines.append(line)
+    return "\n".join(topic_lines).strip(), "\n".join(material_lines).strip()
+
+
 def _limit_source_lines(text: str, source: str, max_count: int) -> str:
     count = 0
     result = []
@@ -378,7 +389,7 @@ def format_stage(stage: dict, idx: int, total: int) -> str:
         if materials:
             text += f"*Материалы:*\n{linkify_materials(materials)}\n\n"
     if stage.get("outcome"):
-        text += f"✨ *Результат:* _{stage['outcome']}_"
+        text += f"*Результат:* _{stage['outcome']}_"
     return text[:4000]
 
 
@@ -466,13 +477,13 @@ async def got_goal(message: Message, state: FSMContext):
 
     if status == "abstract":
         await message.answer(
-            f"🤔 Цель слишком размытая.\n\n{explanation}"
+            f"Цель слишком размытая.\n\n{explanation}"
         )
         return
 
     if status == "institutional":
         await message.answer(
-            f"🏛 *Это институциональная профессия*\n\n"
+            f"*Это институциональная профессия*\n\n"
             f"{explanation}\n\n"
             f"Я не смогу помочь попасть туда напрямую, но могу составить трек по смежным навыкам. "
             f"Напиши конкретный навык — например, _физика_, _аэродинамика_, _лётная подготовка_.",
@@ -497,7 +508,7 @@ async def got_hours(callback: CallbackQuery, state: FSMContext):
     await state.update_data(hours=hours)
     await callback.message.edit_reply_markup(reply_markup=None)
     await callback.message.answer(
-        f"⏱ *{hours} ч/нед* — принято!\n\nЗа сколько месяцев хочешь достичь цели?",
+        f"*{hours} ч/нед* — принято! За сколько месяцев хочешь достичь цели?",
         reply_markup=kb_months(),
     )
     await state.set_state(Form.months)
@@ -524,7 +535,7 @@ async def got_months(callback: CallbackQuery, state: FSMContext):
     await state.update_data(months=months)
     await callback.message.edit_reply_markup(reply_markup=None)
     await callback.message.answer(
-        "🎯 *Что движет тобой?* Это поможет подобрать материалы точнее.",
+        "*Что движет тобой?* Это поможет подобрать материалы точнее.",
         reply_markup=kb_motivation(),
     )
     await state.set_state(Form.motivation)
@@ -537,7 +548,7 @@ async def got_motivation(callback: CallbackQuery, state: FSMContext):
     await state.update_data(motivation=motivation)
     await callback.message.edit_reply_markup(reply_markup=None)
     await callback.message.answer(
-        "📚 *Какой формат материалов предпочитаешь?*",
+        "*Какой формат материалов предпочитаешь?*",
         reply_markup=kb_format(),
     )
     await state.set_state(Form.format_pref)
@@ -580,12 +591,12 @@ async def _send_question(message: Message, state: FSMContext):
     q_text = questions[idx].get("question", questions[idx].get("q", f"Вопрос {idx + 1}"))
     try:
         await message.answer(
-            f"📋 *Вопрос {idx + 1} из {len(questions)}*\n\n{q_text}",
+            f"*Вопрос {idx + 1} из {len(questions)}*\n\n{q_text}",
             reply_markup=kb_quiz(),
         )
     except Exception:
         await message.answer(
-            f"📋 Вопрос {idx + 1} из {len(questions)}\n\n{q_text}",
+            f"Вопрос {idx + 1} из {len(questions)}\n\n{q_text}",
             parse_mode=None,
             reply_markup=kb_quiz(),
         )
@@ -636,18 +647,15 @@ async def got_answer(callback: CallbackQuery, state: FSMContext):
 
     motivation = data.get("motivation", "")
     format_pref = data.get("format_pref", "")
-    mot_emoji = {"Новая профессия": "🚀", "Текущая работа": "💼", "Личное обучение": "📚"}.get(motivation, "🎯")
-    fmt_emoji = {"Видео": "🎥", "Статьи": "📄", "Курсы": "🎓", "Любой формат": "🔀"}.get(format_pref, "📚")
-
     await callback.message.answer(
-        f"👤 *Твой профиль готов*\n\n"
-        f"📌 *Цель:* {escape_md(data['goal'])}\n"
-        f"📊 *Уровень:* {level}\n"
+        f"*Твой профиль*\n\n"
+        f"*Цель:* {escape_md(data['goal'])}\n"
+        f"*Уровень:* {level}\n"
         f"_{level_desc}_\n\n"
-        f"{mot_emoji} *Мотивация:* {motivation}\n"
-        f"{fmt_emoji} *Формат:* {format_pref}\n"
-        f"⏱ *Время:* {data['hours']} ч/нед · {data['months']} мес\n\n"
-        f"⏳ Строю персональный трек — это займёт около минуты.",
+        f"*Мотивация:* {motivation}\n"
+        f"*Формат:* {format_pref}\n"
+        f"*Время:* {data['hours']} ч/нед · {data['months']} мес\n\n"
+        f"Строю персональный трек — это займёт около минуты.",
         reply_markup=kb_build(),
     )
 
@@ -694,7 +702,7 @@ async def build_track(callback: CallbackQuery, state: FSMContext):
     await state.update_data(stages=stages, summary=summary, current_stage=0, completed=[])
     await state.set_state(Form.track)
     if summary:
-        await callback.message.answer(f"🎯 *Карьерные перспективы после трека:*\n\n{summary}")
+        await callback.message.answer(f"*Карьерные перспективы после трека:*\n\n{summary}")
     await _send_stage(callback.message, state, 0)
 
 
@@ -739,7 +747,7 @@ async def _send_stage(message: Message, state: FSMContext, idx: int):
 
     if idx >= len(stages):
         await message.answer(
-            "🏆 *Маршрут пройден! Поздравляю!*\n\n"
+            "*Маршрут пройден! Поздравляю!*\n\n"
             f"Ты прошёл весь трек по теме *{escape_md(data.get('goal', ''))}*.\n\n"
             "Это большой шаг — продолжай в том же духе! "
             "Хочешь закрепить результат или освоить что-то новое?",
@@ -761,7 +769,7 @@ async def _send_stage(message: Message, state: FSMContext, idx: int):
         try:
             courses = await asyncio.to_thread(search_stepik_courses, data.get("goal", stage["title"]), 0, 3)
             if courses:
-                lines = ["\n📚 *Курсы на Stepik по этому этапу:*\n"]
+                lines = ["\n*Курсы на Stepik по этому этапу:*\n"]
                 for c in courses:
                     lines.append(f"• [{c['title']}]({c['url']})")
                 stepik_block = "\n".join(lines)
@@ -839,7 +847,7 @@ async def stage_hard(callback: CallbackQuery, state: FSMContext):
 
     await callback.message.edit_reply_markup(reply_markup=None)
     await callback.answer("Адаптирую под твой уровень...")
-    msg = await callback.message.answer("⏳ Делаю этот этап проще...")
+    msg = await callback.message.answer("Делаю этот этап проще...")
 
     prompt = simplify_prompt(data["goal"], data["level"], stage["title"], stage["topics"])
     try:
@@ -847,8 +855,9 @@ async def stage_hard(callback: CallbackQuery, state: FSMContext):
     except Exception:
         await msg.edit_text("❌ Не удалось адаптировать. Попробуй перейти к следующему этапу.")
         return
-    stages[idx]["topics"] = result.strip()
-    stages[idx]["materials"] = ""
+    topics, materials = _split_llm_response(result.strip())
+    stages[idx]["topics"] = topics
+    stages[idx]["materials"] = materials
     stages[idx]["modified"] = "simplified"
     await state.update_data(stages=stages)
     await msg.delete()
@@ -868,7 +877,7 @@ async def stage_easy(callback: CallbackQuery, state: FSMContext):
 
     await callback.message.edit_reply_markup(reply_markup=None)
     await callback.answer("Усложняю материал...")
-    msg = await callback.message.answer("⏳ Подбираю более продвинутые материалы...")
+    msg = await callback.message.answer("Подбираю более продвинутые материалы...")
 
     prompt = advance_prompt(data["goal"], data["level"], stage["title"], stage["topics"])
     try:
@@ -876,8 +885,9 @@ async def stage_easy(callback: CallbackQuery, state: FSMContext):
     except Exception:
         await msg.edit_text("❌ Не удалось усложнить. Попробуй перейти к следующему этапу.")
         return
-    stages[idx]["topics"] = result.strip()
-    stages[idx]["materials"] = ""
+    topics, materials = _split_llm_response(result.strip())
+    stages[idx]["topics"] = topics
+    stages[idx]["materials"] = materials
     stages[idx]["modified"] = "advanced"
     await state.update_data(stages=stages)
     await msg.delete()
@@ -897,7 +907,7 @@ async def stage_bad(callback: CallbackQuery, state: FSMContext):
 
     await callback.message.edit_reply_markup(reply_markup=None)
     await callback.answer("Подбираю альтернативные материалы...")
-    msg = await callback.message.answer("⏳ Ищу другие материалы...")
+    msg = await callback.message.answer("Ищу другие материалы...")
 
     prompt = alternative_prompt(data["goal"], data["level"], stage["title"], stage["topics"])
     try:
