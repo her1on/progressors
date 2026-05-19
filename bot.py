@@ -704,12 +704,13 @@ async def restart(callback: CallbackQuery, state: FSMContext):
 
 async def main():
     logger.info("Bot starting...")
+    await bot.delete_webhook(drop_pending_updates=True)
     await bot.set_my_commands([
         BotCommand(command="start", description="Начать / перезапустить"),
         BotCommand(command="cancel", description="Отменить текущий процесс"),
         BotCommand(command="help", description="Справка"),
     ])
-    await dp.start_polling(bot)
+    await dp.start_polling(bot, allowed_updates=dp.resolve_used_update_types())
 
 
 if __name__ == "__main__":
