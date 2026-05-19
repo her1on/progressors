@@ -245,14 +245,14 @@ def linkify_materials(text: str) -> str:
         rest = m.group(2).strip()
         title = rest.split(" — ")[0].strip()
         title = re.sub(r"\s*\([^)]*\)\s*$", "", title).strip()
-        title = re.sub(r"[\[\]\*\"\']+", "", title).strip()
+        title = re.sub(r"[\[\]\*\"\'\\]+", "", title).strip()
         base = _SOURCE_SEARCH.get(source.lower())
-        if not base or not title or source.lower() == "stepik":
+        if not base or not title:
             return m.group(0)
         url = base.format(urllib.parse.quote_plus(title))
         return f"[{source}: {title}]({url})"
 
-    return re.sub(r"\[([^\]\n]+)\]\s+([^\n]+)", replace, text)
+    return re.sub(r"\[([^\]\n]+)\]\s+([^\n\[]+)", replace, text)
 
 
 def calc_level(answers: list[str]) -> str:
