@@ -21,7 +21,7 @@ def call_gigachat(prompt: str) -> str:
     for attempt in range(3):
         try:
             response = client.chat.completions.create(
-                model="gpt-5.5",
+                model="gpt-5.4",
                 messages=[{"role": "user", "content": prompt}],
             )
             return response.choices[0].message.content
