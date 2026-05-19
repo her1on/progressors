@@ -93,7 +93,7 @@ async def _validate_goal(goal: str) -> tuple[str, str]:
     """Возвращает (status, message). status: ok | abstract | institutional | unrealistic."""
     try:
         raw = await asyncio.to_thread(call_gigachat, validate_prompt(goal))
-        logger.info(f"Validation raw response for '{goal}': {raw!r}")
+        print(f"[VALIDATE] goal={goal!r} raw={raw!r}", flush=True)
         lines = raw.strip().splitlines()
         first = lines[0].strip()
         explanation = lines[1].strip() if len(lines) > 1 else ""
@@ -104,7 +104,7 @@ async def _validate_goal(goal: str) -> tuple[str, str]:
         if "ИНСТИТУЦИОНАЛЬНЫЙ" in first:
             return "institutional", explanation
     except Exception as e:
-        logger.error(f"Validation failed for '{goal}': {e}")
+        print(f"[VALIDATE ERROR] goal={goal!r} error={e!r}", flush=True)
     return "ok", ""
 
 
