@@ -5,11 +5,12 @@ import re
 
 from aiogram import Bot, Dispatcher, F
 from aiogram.client.default import DefaultBotProperties
-from aiogram.filters import CommandStart
+from aiogram.filters import Command, CommandStart
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram.types import (
+    BotCommand,
     CallbackQuery,
     InlineKeyboardButton,
     InlineKeyboardMarkup,
@@ -58,6 +59,7 @@ class Form(StatesGroup):
     goal = State()
     hours = State()
     months = State()
+    budget = State()
     quiz = State()
     track = State()
 
@@ -82,6 +84,19 @@ def kb_months():
     ]])
 
 
+def kb_budget():
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [
+            InlineKeyboardButton(text="0 руб (бесплатно)", callback_data="b_0"),
+            InlineKeyboardButton(text="до 1 000 руб", callback_data="b_1000"),
+        ],
+        [
+            InlineKeyboardButton(text="до 3 000 руб", callback_data="b_3000"),
+            InlineKeyboardButton(text="5 000+ руб", callback_data="b_5000"),
+        ],
+    ])
+
+
 def kb_quiz():
     return InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text=f"{k}  {v}", callback_data=f"q_{k}")]
@@ -103,10 +118,13 @@ def kb_stage(idx: int, is_last: bool):
             InlineKeyboardButton(text="👎 Не подошло", callback_data=f"bad_{idx}"),
         ],
     ]
+    nav = []
+    if idx > 0:
+        nav.append(InlineKeyboardButton(text="⬅️ Назад", callback_data=f"prev_{idx}"))
     if not is_last:
-        rows.append([
-            InlineKeyboardButton(text="➡️ Следующий этап", callback_data=f"next_{idx}"),
-        ])
+        nav.append(InlineKeyboardButton(text="➡️ Следующий этап", callback_data=f"next_{idx}"))
+    if nav:
+        rows.append(nav)
     return InlineKeyboardMarkup(inline_keyboard=rows)
 
 
@@ -117,6 +135,12 @@ def kb_restart():
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
+
+def escape_md(text: str) -> str:
+    for ch in r"*_`[":
+        text = text.replace(ch, f"\\{ch}")
+    return text
+
 
 def calc_level(answers: list[str]) -> str:
     score = sum("ABCD".index(a) for a in answers)
@@ -130,38 +154,61 @@ def calc_level(answers: list[str]) -> str:
 
 
 def parse_track(text: str) -> list[dict]:
-    text = re.sub(r"```[a-z]*\n?", "", text).strip()
+    text = re.sub(r"```[a-zA-Z]*\n?", "", text).replace("```", "").strip()
     stages = []
-    parts = re.split(r"\n(?=##\s)", "\n" + text)
+
+    # Разбиваем по любому заголовку ## уровня (включая ###)
+    parts = re.split(r"\n(?=#{2,3}\s)", "\n" + text)
 
     for part in parts:
-        if not re.match(r"##[^\n]*(?:Этап|Шаг)\s*\d+", part):
+        first_line = part.split("\n")[0]
+
+        # Пропускаем итоговый раздел и пустые части
+        if re.search(r"Итог|Результат трека|Карьер", first_line, re.IGNORECASE):
             continue
+        # Блок должен выглядеть как этап: содержит цифру или слова Этап/Шаг/Step
+        if not re.search(r"(?:Этап|Шаг|Step|\d+)", first_line, re.IGNORECASE):
+            continue
+        # Пропускаем если нет содержимого (только заголовок)
+        if len(part.strip().split("\n")) < 2:
+            continue
+
         idx = len(stages)
 
-        title_m = re.match(r"##[^\n]*(?:Этап|Шаг)\s*\d+[:.]\s*(.+)", part)
-        title = title_m.group(1).strip() if title_m else f"Этап {idx + 1}"
+        # Извлекаем название: всё после номера и двоеточия/точки
+        title_m = re.search(r"(?:Этап|Шаг|Step)?\s*\d+[.:)—\s]+(.+)", first_line, re.IGNORECASE)
+        if title_m:
+            title = title_m.group(1).strip().lstrip("📍").strip()
+        else:
+            # Заголовок без явного номера — берём всё после ##
+            title = re.sub(r"^#{2,3}\s*", "", first_line).strip()
+        title = title or f"Этап {idx + 1}"
 
-        weeks_m = re.search(r"\*\*Длительность:\*\*\s*(\d+)", part)
+        weeks_m = re.search(r"\*{0,2}Длительность:?\*{0,2}\s*(\d+)", part)
         weeks = int(weeks_m.group(1)) if weeks_m else 2
 
         topics_m = re.search(
-            r"\*\*Что изучать:\*\*(.+?)(?=\*\*Материалы:|\*\*Результат:|\Z)",
-            part, re.DOTALL,
+            r"\*{0,2}Что изучать:?\*{0,2}(.+?)(?=\*{0,2}Материал|\*{0,2}Результат|\Z)",
+            part, re.DOTALL | re.IGNORECASE,
         )
         topics = topics_m.group(1).strip() if topics_m else ""
 
         materials_m = re.search(
-            r"\*\*Материалы:\*\*(.+?)(?=\*\*Результат:|\Z)",
-            part, re.DOTALL,
+            r"\*{0,2}Материал[ыь]:?\*{0,2}(.+?)(?=\*{0,2}Результат|\Z)",
+            part, re.DOTALL | re.IGNORECASE,
         )
         materials = materials_m.group(1).strip() if materials_m else ""
 
         outcome_m = re.search(
-            r"\*\*Результат:\*\*\s*(.+?)(?=\n##|\Z)",
-            part, re.DOTALL,
+            r"\*{0,2}Результат:?\*{0,2}\s*(.+?)(?=\n#{2,3}|\Z)",
+            part, re.DOTALL | re.IGNORECASE,
         )
         outcome = outcome_m.group(1).strip().replace("\n", " ") if outcome_m else ""
+
+        # Если ничего не распарсилось — берём весь текст блока как topics
+        if not topics and not materials:
+            body = "\n".join(part.split("\n")[1:]).strip()
+            topics = body[:800]
 
         stages.append({
             "id": idx + 1,
@@ -195,14 +242,46 @@ def format_stage(stage: dict, idx: int, total: int) -> str:
 async def cmd_start(message: Message, state: FSMContext):
     await state.clear()
     await message.answer(
-        "🪐 *Прогрессоры* — твой ИИ\\-навигатор по обучению\n\n"
+        "🪐 *Прогрессоры* — твой ИИ-навигатор по обучению\n\n"
         "Я помогу построить персональный трек обучения — с бесплатными материалами "
-        "на русском языке, подобранными под твой уровень и цели\\.\n\n"
+        "на русском языке, подобранными под твой уровень и цели.\n\n"
         "Скажи мне — *чему хочешь научиться?*\n"
-        "_Например: Python, UX\\-дизайн, маркетинг, сварка, английский язык_",
-        parse_mode="MarkdownV2",
+        "_Например: Python, UX-дизайн, маркетинг, сварка, английский язык_",
     )
     await state.set_state(Form.goal)
+
+
+@dp.message(Command("help"))
+async def cmd_help(message: Message):
+    await message.answer(
+        "*Прогрессоры* — ИИ-навигатор по обучению\n\n"
+        "*Как это работает:*\n"
+        "1. Скажи чему хочешь научиться\n"
+        "2. Укажи сколько времени готов тратить\n"
+        "3. Пройди короткую диагностику\n"
+        "4. Получи персональный трек с бесплатными материалами\n\n"
+        "*Команды:*\n"
+        "/start — начать или перезапустить\n"
+        "/cancel — отменить текущий процесс\n"
+        "/help — эта справка\n\n"
+        "*На каждом этапе трека можно:*\n"
+        "✅ Отметить как пройденное\n"
+        "😕 Попросить упростить материал\n"
+        "👎 Получить альтернативные ресурсы\n"
+        "➡️ Пропустить и перейти дальше",
+    )
+
+
+@dp.message(Command("cancel"))
+async def cmd_cancel(message: Message, state: FSMContext):
+    current = await state.get_state()
+    if current is None:
+        await message.answer("Нечего отменять. Введи /start чтобы начать.")
+        return
+    await state.clear()
+    await message.answer(
+        "❌ Сброшено. Введи /start чтобы начать заново.",
+    )
 
 
 @dp.message(Form.goal)
@@ -216,7 +295,7 @@ async def got_goal(message: Message, state: FSMContext):
 
     await state.update_data(goal=goal)
     await message.answer(
-        f"Отлично! Цель: *{goal}*\n\nСколько часов в неделю готов уделять учёбе?",
+        f"Отлично! Цель: *{escape_md(goal)}*\n\nСколько часов в неделю готов уделять учёбе?",
         reply_markup=kb_hours(),
     )
     await state.set_state(Form.hours)
@@ -239,10 +318,28 @@ async def got_hours(callback: CallbackQuery, state: FSMContext):
 async def got_months(callback: CallbackQuery, state: FSMContext):
     months = int(callback.data.split("_")[1])
     await state.update_data(months=months)
+    await callback.message.edit_reply_markup(reply_markup=None)
+    await callback.message.answer(
+        f"📅 *{months} мес* — отлично!\n\nКакой месячный бюджет на обучение?",
+        reply_markup=kb_budget(),
+    )
+    await state.set_state(Form.budget)
+    await callback.answer()
+
+
+@dp.callback_query(Form.budget, F.data.startswith("b_"))
+async def got_budget(callback: CallbackQuery, state: FSMContext):
+    budget = int(callback.data.split("_")[1])
+    await state.update_data(budget=budget)
     data = await state.get_data()
     await callback.message.edit_reply_markup(reply_markup=None)
 
-    msg = await callback.message.answer("⏳ Генерирую вопросы для диагностики...")
+    budget_label = "бесплатно" if budget == 0 else f"до {budget:,} руб/мес".replace(",", " ")
+    await callback.message.answer(
+        f"💰 *{budget_label}* — принято!\n\n⏳ Генерирую вопросы для диагностики...",
+    )
+
+    msg = await callback.message.answer("...")
     try:
         raw = await asyncio.to_thread(call_gigachat, questions_prompt(data["goal"]))
         questions = parse_questions(raw)
@@ -302,11 +399,13 @@ async def got_answer(callback: CallbackQuery, state: FSMContext):
 
     await state.update_data(level=level, qa_text=qa_text)
 
+    budget = data.get("budget", 0)
+    budget_label = "бесплатно" if budget == 0 else f"до {budget:,} руб/мес".replace(",", " ")
     await callback.message.answer(
         f"🎯 *Уровень определён*\n\n"
         f"*{level}*\n_{level_desc}_\n\n"
-        f"📌 Цель: *{data['goal']}*\n"
-        f"⏱ {data['hours']} ч/нед · {data['months']} мес\n\n"
+        f"📌 Цель: *{escape_md(data['goal'])}*\n"
+        f"⏱ {data['hours']} ч/нед · {data['months']} мес · {budget_label}\n\n"
         f"Готов к персональному треку?",
         reply_markup=kb_build(),
     )
@@ -325,6 +424,7 @@ async def build_track(callback: CallbackQuery, state: FSMContext):
         hours=data["hours"],
         months=data["months"],
         weeks=weeks,
+        budget=data.get("budget", 0),
         qa_text=data["qa_text"],
     )
 
@@ -353,9 +453,8 @@ async def _send_stage(message: Message, state: FSMContext, idx: int):
     if idx >= len(stages):
         await message.answer(
             "🌟 *Маршрут пройден! Поздравляю!*\n\n"
-            f"Ты прошёл весь трек по теме *{data.get('goal', '')}*\\.\n\n"
+            f"Ты прошёл весь трек по теме *{escape_md(data.get('goal', ''))}*.\n\n"
             "Хочешь построить новый маршрут?",
-            parse_mode="MarkdownV2",
             reply_markup=kb_restart(),
         )
         return
@@ -386,6 +485,16 @@ async def stage_next(callback: CallbackQuery, state: FSMContext):
     await callback.message.edit_reply_markup(reply_markup=None)
     await callback.answer()
     await _send_stage(callback.message, state, idx + 1)
+
+
+@dp.callback_query(Form.track, F.data.startswith("prev_"))
+async def stage_prev(callback: CallbackQuery, state: FSMContext):
+    idx = int(callback.data.split("_")[1])
+    prev_idx = idx - 1
+    await state.update_data(current_stage=prev_idx)
+    await callback.message.edit_reply_markup(reply_markup=None)
+    await callback.answer()
+    await _send_stage(callback.message, state, prev_idx)
 
 
 @dp.callback_query(Form.track, F.data.startswith("hard_"))
@@ -444,6 +553,11 @@ async def restart(callback: CallbackQuery, state: FSMContext):
 
 async def main():
     logger.info("Bot starting...")
+    await bot.set_my_commands([
+        BotCommand(command="start", description="Начать / перезапустить"),
+        BotCommand(command="cancel", description="Отменить текущий процесс"),
+        BotCommand(command="help", description="Справка"),
+    ])
     await dp.start_polling(bot)
 
 
