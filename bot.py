@@ -93,22 +93,26 @@ async def _fetch_questions(goal: str) -> list[dict]:
     ]
 
 
-async def _validate_goal(goal: str) -> tuple[str, str]:
-    """Возвращает (status, message). status: ok | abstract | institutional | unrealistic."""
+async def _validate_goal(goal: str) -> tuple[str, str, str]:
+    """Возвращает (status, explanation, scope). status: ok | abstract | institutional | unrealistic. scope: узкий | широкий."""
     try:
         raw = await asyncio.to_thread(call_llm, validate_prompt(goal))
         lines = raw.strip().splitlines()
         first = lines[0].strip().upper()
+        if "РЕАЛИСТИЧНО" in first:
+            scope = lines[1].strip().lower() if len(lines) > 1 else "широкий"
+            scope = "узкий" if "узкий" in scope else "широкий"
+            return "ok", "", scope
         explanation = lines[1].strip() if len(lines) > 1 else ""
         if "НЕРЕАЛИСТИЧНО" in first:
-            return "unrealistic", explanation or "Цель физически невозможна."
+            return "unrealistic", explanation or "Цель физически невозможна.", "широкий"
         if "АБСТРАКТНО" in first:
-            return "abstract", explanation or "Уточни цель — укажи конкретный навык."
+            return "abstract", explanation or "Уточни цель — укажи конкретный навык.", "широкий"
         if "ИНСТИТУЦИОНАЛЬНЫЙ" in first:
-            return "institutional", explanation
+            return "institutional", explanation, "широкий"
     except Exception as e:
         logger.warning(f"[VALIDATE ERROR] goal={goal!r} error={e!r}")
-    return "ok", ""
+    return "ok", "", "широкий"
 
 
 async def _fetch_track(prompt: str) -> tuple[list[dict], str]:
@@ -466,7 +470,7 @@ async def got_goal(message: Message, state: FSMContext):
     stop = asyncio.Event()
     typing_task = asyncio.create_task(_typing_loop(message.chat.id, stop))
     try:
-        status, explanation = await _validate_goal(goal)
+        status, explanation, scope = await _validate_goal(goal)
     finally:
         stop.set()
         typing_task.cancel()
@@ -493,7 +497,7 @@ async def got_goal(message: Message, state: FSMContext):
     # Запускаем генерацию вопросов фоново, пока пользователь выбирает часы и месяцы
     questions_task = asyncio.create_task(_fetch_questions(goal))
     _questions_tasks[message.from_user.id] = questions_task
-    await state.update_data(goal=goal)
+    await state.update_data(goal=goal, goal_scope=scope)
 
     await message.answer(
         f"Отлично! Цель: *{escape_md(goal)}*\n\nСколько часов в неделю готов уделять учёбе?",
@@ -536,16 +540,22 @@ FORMAT_LABELS = {
 async def got_months(callback: CallbackQuery, state: FSMContext):
     months = int(callback.data.split("_")[1])
     await state.update_data(months=months)
+    data = await state.get_data()
     await callback.answer()
     try:
         await callback.message.delete()
     except Exception:
         pass
-    await callback.message.answer(
-        "*Что движет тобой?* Это поможет подобрать материалы точнее.",
-        reply_markup=kb_motivation(),
-    )
-    await state.set_state(Form.motivation)
+
+    if data.get("goal_scope") == "узкий":
+        await state.update_data(motivation="Личное обучение", format_pref="Любой формат")
+        await _resolve_questions_and_start_quiz(callback, state)
+    else:
+        await callback.message.answer(
+            "*Что движет тобой?* Это поможет подобрать материалы точнее.",
+            reply_markup=kb_motivation(),
+        )
+        await state.set_state(Form.motivation)
 
 
 @dp.callback_query(Form.motivation, F.data.startswith("mot_"))
@@ -564,17 +574,9 @@ async def got_motivation(callback: CallbackQuery, state: FSMContext):
     await state.set_state(Form.format_pref)
 
 
-@dp.callback_query(Form.format_pref, F.data.startswith("fmt_"))
-async def got_format(callback: CallbackQuery, state: FSMContext):
-    format_pref = FORMAT_LABELS[callback.data]
-    await state.update_data(format_pref=format_pref)
+async def _resolve_questions_and_start_quiz(callback: CallbackQuery, state: FSMContext):
+    """Получает вопросы квиза (из фонового таска или свежим запросом) и запускает квиз."""
     data = await state.get_data()
-    await callback.answer()
-    try:
-        await callback.message.delete()
-    except Exception:
-        pass
-
     user_id = callback.from_user.id
     task = _questions_tasks.pop(user_id, None)
 
@@ -594,6 +596,18 @@ async def got_format(callback: CallbackQuery, state: FSMContext):
     await state.update_data(questions=questions, current_q=0, answers=[])
     await _send_question(callback.message, state)
     await state.set_state(Form.quiz)
+
+
+@dp.callback_query(Form.format_pref, F.data.startswith("fmt_"))
+async def got_format(callback: CallbackQuery, state: FSMContext):
+    format_pref = FORMAT_LABELS[callback.data]
+    await state.update_data(format_pref=format_pref)
+    await callback.answer()
+    try:
+        await callback.message.delete()
+    except Exception:
+        pass
+    await _resolve_questions_and_start_quiz(callback, state)
 
 
 async def _send_question(message: Message, state: FSMContext):
