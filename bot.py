@@ -742,8 +742,10 @@ if __name__ == "__main__":
     async def health(request):
         info = await bot.get_webhook_info()
         token_tail = BOT_TOKEN[-6:] if BOT_TOKEN else "NONE"
+        domain = os.getenv("RAILWAY_PUBLIC_DOMAIN", "NOT SET")
         return web.Response(text=(
             f"token_tail=...{token_tail}\n"
+            f"RAILWAY_PUBLIC_DOMAIN={domain!r}\n"
             f"webhook_url={info.url!r}\n"
             f"pending_updates={info.pending_update_count}\n"
             f"last_error={info.last_error_message!r}\n"
