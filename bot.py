@@ -676,6 +676,7 @@ async def got_answer(callback: CallbackQuery, state: FSMContext):
         qa_text=qa_text,
         motivation=data.get("motivation", ""),
         format_pref=data.get("format_pref", ""),
+        scope=data.get("goal_scope", "широкий"),
     )
     track_task = asyncio.create_task(_fetch_track(prompt))
     _track_tasks[callback.from_user.id] = track_task
@@ -726,6 +727,7 @@ async def build_track(callback: CallbackQuery, state: FSMContext):
                     qa_text=data["qa_text"],
                     motivation=data.get("motivation", ""),
                     format_pref=data.get("format_pref", ""),
+                    scope=data.get("goal_scope", "широкий"),
                 )
                 task = asyncio.create_task(_fetch_track(prompt))
             stages, summary = await task
@@ -751,7 +753,13 @@ async def build_track(callback: CallbackQuery, state: FSMContext):
     await state.update_data(stages=stages, summary=summary, current_stage=0, completed=[])
     await state.set_state(Form.track)
     if summary:
-        await callback.message.answer(f"*Карьерные перспективы после трека:*\n\n{summary}")
+        final_data = await state.get_data()
+        summary_label = (
+            "Что ты умеешь после трека:"
+            if final_data.get("goal_scope") == "узкий"
+            else "Карьерные перспективы после трека:"
+        )
+        await callback.message.answer(f"*{summary_label}*\n\n{summary}")
     await _send_stage(callback.message, state, 0)
 
 
