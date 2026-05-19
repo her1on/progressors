@@ -10,6 +10,7 @@ from aiogram.filters import Command, CommandStart
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.fsm.storage.memory import MemoryStorage
+from aiogram.fsm.storage.redis import RedisStorage
 from aiogram.types import (
     BotCommand,
     CallbackQuery,
@@ -44,7 +45,8 @@ logger = logging.getLogger(__name__)
 BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 
 bot = Bot(token=BOT_TOKEN, default=DefaultBotProperties(parse_mode="Markdown"))
-storage = MemoryStorage()
+_redis_url = os.getenv("REDIS_URL", "")
+storage = RedisStorage.from_url(_redis_url) if _redis_url else MemoryStorage()
 dp = Dispatcher(storage=storage)
 
 LEVELS = {
