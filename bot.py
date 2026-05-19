@@ -301,19 +301,19 @@ def parse_track(text: str) -> list[dict]:
         weeks = int(weeks_m.group(1)) if weeks_m else 2
 
         topics_m = re.search(
-            r"\*{0,2}Что изучать:?\*{0,2}(.+?)(?=\*{0,2}Материал|\*{0,2}Результат|\Z)",
+            r"\*{0,2}Что изучать:?\*{0,2}(.+?)(?=\n\*{0,2}Материал|\n\*{0,2}Результат|\Z)",
             part, re.DOTALL | re.IGNORECASE,
         )
         topics = topics_m.group(1).strip() if topics_m else ""
 
         materials_m = re.search(
-            r"\*{0,2}Материал[ыь]:?\*{0,2}(.+?)(?=\*{0,2}Результат|\Z)",
+            r"\n\*{0,2}Материал[ыь]:?\*{0,2}(.+?)(?=\n\*{0,2}Результат|\Z)",
             part, re.DOTALL | re.IGNORECASE,
         )
         materials = materials_m.group(1).strip() if materials_m else ""
 
         outcome_m = re.search(
-            r"\*{0,2}Результат:?\*{0,2}\s*(.+?)(?=\n#{2,3}|\Z)",
+            r"\n\*{0,2}Результат:?\*{0,2}\s*(.+?)(?=\n#{2,3}|\Z)",
             part, re.DOTALL | re.IGNORECASE,
         )
         outcome = outcome_m.group(1).strip().replace("\n", " ") if outcome_m else ""
