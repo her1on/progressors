@@ -408,6 +408,7 @@ async def got_goal(message: Message, state: FSMContext):
         typing_task.cancel()
 
     logger.warning(f"[VALIDATE_RESULT] goal={goal!r} status={status!r}")
+    await message.answer(f"[DEBUG] status={status!r} explanation={explanation[:80]!r}")
 
     if status == "unrealistic":
         await message.answer(f"❌ {explanation}\n\nПопробуй сформулировать цель иначе.")
