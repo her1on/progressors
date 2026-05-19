@@ -33,6 +33,7 @@ from bot_prompts import (
 )
 from gigachat_client import call_gigachat
 from level import parse_questions
+from stepik import search_stepik_courses
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -390,7 +391,7 @@ async def cmd_help(message: Message):
     )
 
 
-@dp.message(F.text == "🚀 Новый маршрут")
+@dp.message(F.text.in_({"🚀 Новый маршрут", "Новый маршрут"}))
 async def menu_new_route(message: Message, state: FSMContext):
     await cmd_start(message, state)
 
@@ -659,6 +660,19 @@ async def build_track(callback: CallbackQuery, state: FSMContext):
 
     await state.update_data(stages=stages, current_stage=0, completed=[])
     await state.set_state(Form.track)
+
+    data = await state.get_data()
+    try:
+        courses = await asyncio.to_thread(search_stepik_courses, data["goal"], 0, 5)
+        if courses:
+            lines = ["📚 *Курсы на Stepik по твоей теме:*\n"]
+            for c in courses:
+                price_text = "бесплатно" if c["price"] == 0 else f"{c['price']} ₽"
+                lines.append(f"• [{escape_md(c['title'])}]({c['url']}) — {price_text}")
+            await callback.message.answer("\n".join(lines))
+    except Exception:
+        pass
+
     await _send_stage(callback.message, state, 0)
 
 
