@@ -281,6 +281,14 @@ def linkify_materials(text: str, stage_topic: str = "") -> str:
     """Превращает [YouTube] Название — Канал в кликабельную ссылку на поиск."""
     habr_query = " ".join(stage_topic.split()[:3]) if stage_topic else ""
 
+    filtered = []
+    for line in text.split("\n"):
+        m = re.search(r"\[([^\]\n]+)\]", line)
+        if m and m.group(1).strip().lower() not in _SOURCE_SEARCH:
+            continue
+        filtered.append(line)
+    text = "\n".join(filtered)
+
     def replace(m: re.Match) -> str:
         source = m.group(1).strip()
         rest = m.group(2).strip()
