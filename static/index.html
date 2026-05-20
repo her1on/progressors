@@ -3315,6 +3315,33 @@ function App() {
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
+  // В Telegram режиме показываем только трек или экран ошибки
+  if (tgInitData && step !== "track") {
+    return (
+      <>
+        <Cosmos />
+        {loading ? (
+          <div style={{ position: "fixed", inset: 0, zIndex: 200, background: "rgba(5,7,15,0.88)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 20, backdropFilter: "blur(10px)" }}>
+            <div className="brand-mark" style={{ width: 56, height: 56, animation: "spin 2s linear infinite" }} />
+            <div style={{ fontFamily: "var(--ff-mono)", fontSize: 13, color: "var(--fg-soft)", letterSpacing: "0.1em", textAlign: "center", maxWidth: 340, lineHeight: 1.6 }}>
+              Загружаем твой трек…
+            </div>
+          </div>
+        ) : (
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "100vh", padding: "32px 24px", textAlign: "center", gap: 20 }}>
+            <div style={{ fontSize: 48 }}>🪐</div>
+            <div style={{ fontSize: 20, fontWeight: 700, color: "var(--fg)" }}>Трек не найден</div>
+            <div style={{ fontSize: 15, color: "var(--fg-soft)", lineHeight: 1.6, maxWidth: 300 }}>
+              Пройди онбординг в боте и нажми кнопку<br/>
+              <strong>«📱 Открыть трек»</strong><br/>
+              после генерации маршрута.
+            </div>
+          </div>
+        )}
+      </>
+    );
+  }
+
   return (
     <>
       <Cosmos />
