@@ -31,7 +31,10 @@ def _request(method: str, path: str, body: dict | None = None, prefer: str | Non
 
 def save_track(user_id: int, goal: str, level: str, hours: int, months: int,
                goal_scope: str, stages: list, summary: str, skills_text: str = "") -> None:
-    payload = {
+    # удаляем все старые записи пользователя, затем вставляем свежую
+    _request("DELETE", f"user_tracks?user_id=eq.{user_id}")
+    _request("POST", "user_tracks", {
+        "user_id": user_id,
         "goal": goal,
         "level": level,
         "hours": hours,
@@ -42,13 +45,7 @@ def save_track(user_id: int, goal: str, level: str, hours: int, months: int,
         "skills_text": skills_text,
         "completed": [],
         "current_stage": 0,
-        "updated_at": "now()",
-    }
-    # обновляем существующую запись; если её нет — создаём
-    updated = _request("PATCH", f"user_tracks?user_id=eq.{user_id}", payload,
-                       prefer="return=representation")
-    if not updated:
-        _request("POST", "user_tracks", {"user_id": user_id, **payload})
+    })
 
 
 def update_progress(user_id: int, completed: list[int], current_stage: int) -> None:
