@@ -108,23 +108,20 @@ async def _fetch_specializations(goal: str) -> list[str]:
 
 async def _validate_goal(goal: str) -> tuple[str, str, str]:
     """Возвращает (status, explanation, scope). status: ok | abstract | institutional | unrealistic. scope: узкий | широкий."""
-    try:
-        raw = await asyncio.to_thread(call_llm, validate_prompt(goal))
-        lines = raw.strip().splitlines()
-        first = lines[0].strip().upper()
-        if "РЕАЛИСТИЧНО" in first:
-            scope = lines[1].strip().lower() if len(lines) > 1 else "широкий"
-            scope = "узкий" if "узкий" in scope else "широкий"
-            return "ok", "", scope
-        explanation = lines[1].strip() if len(lines) > 1 else ""
-        if "НЕРЕАЛИСТИЧНО" in first:
-            return "unrealistic", explanation or "Цель физически невозможна.", "широкий"
-        if "АБСТРАКТНО" in first:
-            return "abstract", explanation or "Уточни цель — укажи конкретный навык.", "широкий"
-        if "ИНСТИТУЦИОНАЛЬНЫЙ" in first:
-            return "institutional", explanation, "широкий"
-    except Exception as e:
-        logger.warning(f"[VALIDATE ERROR] goal={goal!r} error={e!r}")
+    raw = await asyncio.to_thread(call_llm, validate_prompt(goal))
+    lines = raw.strip().splitlines()
+    first = lines[0].strip().upper()
+    if "РЕАЛИСТИЧНО" in first:
+        scope = lines[1].strip().lower() if len(lines) > 1 else "широкий"
+        scope = "узкий" if "узкий" in scope else "широкий"
+        return "ok", "", scope
+    explanation = lines[1].strip() if len(lines) > 1 else ""
+    if "НЕРЕАЛИСТИЧНО" in first:
+        return "unrealistic", explanation or "Цель физически невозможна.", "широкий"
+    if "АБСТРАКТНО" in first:
+        return "abstract", explanation or "Уточни цель — укажи конкретный навык.", "широкий"
+    if "ИНСТИТУЦИОНАЛЬНЫЙ" in first:
+        return "institutional", explanation, "широкий"
     return "ok", "", "широкий"
 
 
@@ -534,6 +531,12 @@ async def got_goal(message: Message, state: FSMContext):
     typing_task = asyncio.create_task(_typing_loop(message.chat.id, stop))
     try:
         status, explanation, scope = await _validate_goal(goal)
+    except Exception as e:
+        stop.set()
+        typing_task.cancel()
+        logger.error(f"[VALIDATE ERROR] goal={goal!r} error={e!r}")
+        await message.answer("⚠️ Сервис временно недоступен. Попробуй ещё раз через несколько секунд.")
+        return
     finally:
         stop.set()
         typing_task.cancel()
@@ -649,7 +652,33 @@ FORMAT_LABELS = {
 async def _proceed_after_months(callback: CallbackQuery, state: FSMContext, data: dict) -> None:
     if data.get("goal_scope") == "узкий":
         await state.update_data(motivation="Личное обучение", format_pref="Любой формат")
-        await _resolve_questions_and_start_quiz(callback, state)
+        user_id = callback.from_user.id
+        task = _questions_tasks.pop(user_id, None)
+        if task:
+            task.cancel()
+        level = "Полный новичок"
+        qa_text = ""
+        await state.update_data(level=level, qa_text=qa_text)
+        weeks = data["months"] * 4
+        prompt = track_prompt(
+            goal=data["goal"],
+            level=level,
+            hours=data["hours"],
+            months=data["months"],
+            weeks=weeks,
+            qa_text=qa_text,
+            motivation="Личное обучение",
+            format_pref="Любой формат",
+            scope="узкий",
+        )
+        track_task = asyncio.create_task(_fetch_track(prompt))
+        _track_tasks[user_id] = track_task
+        await callback.message.answer(
+            f"*Цель:* {escape_md(data['goal'])}\n"
+            f"*Время:* {data['hours']} ч/нед · {data['months']} мес",
+            reply_markup=kb_build(),
+        )
+        await state.set_state(Form.track)
     else:
         await callback.message.answer(
             "*Что движет тобой?* Это поможет подобрать материалы точнее.",
@@ -882,7 +911,12 @@ async def build_track(callback: CallbackQuery, state: FSMContext):
             await loading_msg.delete()
         except Exception:
             pass
-        await callback.message.answer("❌ Не удалось сгенерировать трек. Попробуй ещё раз — /start")
+        await callback.message.answer(
+            "❌ Не удалось сгенерировать трек — сервис временно недоступен.",
+            reply_markup=InlineKeyboardMarkup(inline_keyboard=[[
+                InlineKeyboardButton(text="🔄 Попробовать снова", callback_data="build_track"),
+            ]]),
+        )
         return
     finally:
         stop.set()
