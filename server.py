@@ -15,7 +15,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-from supabase_client import get_track, update_progress as supabase_update_progress
+from supabase_client import get_track, update_progress as supabase_update_progress, update_stages as supabase_update_stages
 from youtube import search_youtube_video
 
 _yt_cache: dict[str, str] = {}
@@ -48,6 +48,11 @@ def _verify_init_data(init_data: str) -> int:
 class ProgressRequest(BaseModel):
     completed: list[int]
     current_stage: int
+
+
+class StageFeedbackRequest(BaseModel):
+    stage_idx: int
+    feedback: str  # "liked" | "disliked"
 
 
 _SEARCH_URLS = {
@@ -104,6 +109,26 @@ async def webapp_get_track(x_init_data: str = Header(...)):
 async def webapp_update_progress(req: ProgressRequest, x_init_data: str = Header(...)):
     user_id = _verify_init_data(x_init_data)
     await asyncio.to_thread(supabase_update_progress, user_id, req.completed, req.current_stage)
+    return {"ok": True}
+
+
+@app.post("/api/webapp/stage-feedback")
+async def webapp_stage_feedback(req: StageFeedbackRequest, x_init_data: str = Header(...)):
+    user_id = _verify_init_data(x_init_data)
+    if req.feedback not in ("liked", "disliked"):
+        raise HTTPException(400, "Invalid feedback value")
+    track = await asyncio.to_thread(get_track, user_id)
+    if not track:
+        raise HTTPException(404, "Track not found")
+    stages = track.get("stages") or []
+    if req.stage_idx < 0 or req.stage_idx >= len(stages):
+        raise HTTPException(400, "Invalid stage index")
+    stage = stages[req.stage_idx]
+    if stage.get("liked") or stage.get("disliked"):
+        raise HTTPException(409, "Already rated")
+    stage["liked"] = req.feedback == "liked"
+    stage["disliked"] = req.feedback == "disliked"
+    await asyncio.to_thread(supabase_update_stages, user_id, stages)
     return {"ok": True}
 
 

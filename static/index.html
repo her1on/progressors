@@ -1236,6 +1236,20 @@ a { color: inherit; text-decoration: none; }
   padding-top: 4px;
 }
 .stage-actions .spacer { flex: 1; }
+.stage-feedback { display: flex; gap: 8px; align-items: center; }
+.btn-feedback {
+  width: 38px; height: 38px; border-radius: 50%; border: 1px solid rgba(255,255,255,0.12);
+  background: rgba(255,255,255,0.05); font-size: 18px; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: background 0.15s, transform 0.1s;
+}
+.btn-feedback:hover { background: rgba(255,255,255,0.12); transform: scale(1.1); }
+.btn-feedback-like:hover { background: rgba(109,240,168,0.15); }
+.btn-feedback-dislike:hover { background: rgba(255,138,110,0.15); }
+.feedback-done { font-size: 13px; color: var(--fg-mute); }
+.chip-liked { color: #6df0a8; border-color: rgba(109,240,168,0.3); background: rgba(109,240,168,0.06); }
+.chip-modified { color: var(--acc-1); border-color: rgba(92,199,255,0.3); background: rgba(92,199,255,0.06); }
+.chip-disliked { color: var(--fg-mute); }
 
 .toast {
   position: fixed;
@@ -2199,12 +2213,8 @@ Object.assign(window, { Topbar, Cosmos });
 const { useState: useStateT, useMemo: useMemoT, useRef: useRefT, useEffect: useEffectT } = React;
 
 const PLAT_SHORT = {
-  stepik:   "St",
-  practicum:"Я",
-  skillbox: "Sb",
-  gb:       "Gb",
-  hexlet:   "Hx",
-  rutube:   "Ru",
+  stepik:  "St",
+  youtube: "▶",
 };
 
 // random-ish but deterministic offset per stage so planets don't sit on a single x line
@@ -2287,9 +2297,6 @@ function Constellation({ stages, activeId, completedIds, onPick }) {
 const _MAT_URLS = {
   youtube: 'https://www.youtube.com/results?search_query={}',
   stepik:  'https://stepik.org/catalog?q={}',
-  habr:    'https://habr.com/ru/search/?q={}',
-  rutube:  'https://rutube.ru/search/?query={}',
-  vk:      'https://vk.com/video?q={}',
 };
 function parseMaterials(text) {
   if (!text) return [];
@@ -2304,10 +2311,11 @@ function parseMaterials(text) {
   }).filter(Boolean);
 }
 
-function StageDetail({ stage, goal, level, isLocked, completed, onComplete, onUnlock }) {
+function StageDetail({ stage, goal, level, isLocked, completed, onComplete, onUnlock, onFeedback }) {
   const mats = stage.materialsLinks && stage.materialsLinks.length > 0
     ? stage.materialsLinks
     : parseMaterials(stage.materialsText);
+  const feedbackGiven = stage.liked || stage.disliked || stage.modified;
   return (
     <div className="stage-detail">
       <div className="panel stage-detail-head">
@@ -2317,6 +2325,10 @@ function StageDetail({ stage, goal, level, isLocked, completed, onComplete, onUn
           {completed && <span className="chip" style={{ color: "var(--acc-good)", borderColor: "rgba(109,240,168,0.3)", background: "rgba(109,240,168,0.06)" }}>● пройдено</span>}
           {!completed && !isLocked && <span className="chip chip-lvl">текущий</span>}
           {isLocked && <span className="chip">⚿ заблокирован</span>}
+          {stage.liked && <span className="chip chip-liked">❤️ понравилось</span>}
+          {stage.modified === "simplified" && <span className="chip chip-modified">↓ упрощён</span>}
+          {stage.modified === "advanced" && <span className="chip chip-modified">↑ усложнён</span>}
+          {(stage.disliked && !stage.modified) && <span className="chip chip-disliked">👎 оценено</span>}
         </div>
         <h3 className="display-3">{stage.title}</h3>
         {isLocked && (
@@ -2370,6 +2382,18 @@ function StageDetail({ stage, goal, level, isLocked, completed, onComplete, onUn
             Открыть этап всё равно
           </button>
         )}
+        <div className="stage-feedback">
+          {!feedbackGiven ? (
+            <>
+              <button className="btn-feedback btn-feedback-like" onClick={() => onFeedback(stage.id, "liked")} title="Понравилось">❤️</button>
+              <button className="btn-feedback btn-feedback-dislike" onClick={() => onFeedback(stage.id, "disliked")} title="Не понравилось">👎</button>
+            </>
+          ) : stage.liked ? (
+            <span className="feedback-done">❤️ Понравилось</span>
+          ) : (
+            <span className="feedback-done">👎 Оценено</span>
+          )}
+        </div>
         <span className="spacer" />
         {!completed ? (
           <button className="btn btn-primary" onClick={onComplete} disabled={isLocked}>
@@ -2442,25 +2466,42 @@ function TrackScreen({ state, setState, onRestart }) {
   const [unlocked, setUnlocked]         = useStateT([firstId]);
   const [toast, setToast]               = useStateT(null);
   const [showComplete, setShowComplete] = useStateT(false);
+  const [stages, setStages]             = useStateT(STAGES);
 
   useEffectT(() => {
-    if (STAGES.length > 0 && completed.length === STAGES.length) {
+    if (stages.length > 0 && completed.length === stages.length) {
       setShowComplete(true);
     }
   }, [completed]);
 
-  // Не используем useMemo — он кэширует по [activeId] и не замечает
-  // обновления STAGES (когда API вернул данные после первого рендера)
-  const activeStage = STAGES.find((s) => s.id === activeId) || STAGES[0];
+  const activeStage = stages.find((s) => s.id === activeId) || stages[0];
 
-  const pct = Math.round((completed.length / STAGES.length) * 100);
+  const onFeedback = (stageId, feedback) => {
+    const tg = window.Telegram?.WebApp;
+    if (!tg) return;
+    const idx = stages.findIndex(s => s.id === stageId);
+    if (idx === -1) return;
+    const updated = stages.map((s, i) => i === idx
+      ? { ...s, liked: feedback === "liked", disliked: feedback === "disliked" }
+      : s
+    );
+    setStages(updated);
+    setToast(feedback === "liked" ? "❤️ Этап сохранён как понравившийся!" : "👎 Отзыв записан");
+    setTimeout(() => setToast(null), 2400);
+    fetch("/api/webapp/stage-feedback", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Init-Data": tg.initData },
+      body: JSON.stringify({ stage_idx: idx, feedback }),
+    }).catch(() => {});
+  };
+
+  const pct = Math.round((completed.length / stages.length) * 100);
 
   const isLocked = (id) => {
     if (unlocked.includes(id)) return false;
-    // sequential rule: locked if previous stage isn't completed
-    const idx = STAGES.findIndex((s) => s.id === id);
+    const idx = stages.findIndex((s) => s.id === id);
     if (idx <= 0) return false;
-    return !completed.includes(STAGES[idx - 1].id);
+    return !completed.includes(stages[idx - 1].id);
   };
 
   const onPick = (id) => {
@@ -2488,8 +2529,8 @@ function TrackScreen({ state, setState, onRestart }) {
         setTimeout(() => planetEl.classList.remove("planet-done-flash"), 600);
       }
       // auto-unlock next
-      const idx = STAGES.findIndex((s) => s.id === id);
-      const nx = STAGES[idx + 1];
+      const idx = stages.findIndex((s) => s.id === id);
+      const nx = stages[idx + 1];
       if (nx && !unlocked.includes(nx.id)) {
         setUnlocked([...unlocked, nx.id]);
         setActiveId(nx.id);
@@ -2532,7 +2573,8 @@ function TrackScreen({ state, setState, onRestart }) {
             <span className="chip chip-lvl">★ {lvl.short}</span>
             <span className="chip">{state.hours} ч/нед</span>
             <span className="chip">{state.months} мес</span>
-            <span className="chip">{STAGES.length} этапов</span>
+            <span className="chip">{stages.length} этапов</span>
+            {state.skills_text && <span className="chip" title={state.skills_text} style={{ maxWidth: 140, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>🎯 {state.skills_text}</span>}
           </div>
         </div>
         <div className="track-progress">
@@ -2547,7 +2589,7 @@ function TrackScreen({ state, setState, onRestart }) {
 
       <div className="track-body">
         <Constellation
-          stages={STAGES}
+          stages={stages}
           activeId={activeId}
           completedIds={completed}
           onPick={onPick}
@@ -2560,6 +2602,7 @@ function TrackScreen({ state, setState, onRestart }) {
           completed={completed.includes(activeStage.id)}
           onComplete={onComplete}
           onUnlock={onUnlock}
+          onFeedback={onFeedback}
         />
       </div>
 
@@ -2610,6 +2653,9 @@ function transformBotStages(botStages, completed, currentStage) {
       materialsText: s.materials || "",
       materialsLinks: s.materials_links || null,
       final: idx === (botStages.length - 1),
+      liked: s.liked || false,
+      disliked: s.disliked || false,
+      modified: s.modified || null,
     };
   });
 }
@@ -2665,7 +2711,7 @@ function App() {
       .then(r => { if (!r.ok) throw new Error(r.status); return r.json(); })
       .then(data => {
         const stages = transformBotStages(data.stages || [], data.completed || [], data.current_stage || 0);
-        setState({ goal: data.goal || "", level: data.level || "", hours: data.hours || 0, months: data.months || 0, stages, courses: {} });
+        setState({ goal: data.goal || "", level: data.level || "", hours: data.hours || 0, months: data.months || 0, skills_text: data.skills_text || "", stages, courses: {} });
         setLoading(false);
       })
       .catch(() => {
