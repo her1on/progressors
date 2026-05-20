@@ -716,7 +716,7 @@ async def got_specialization(callback: CallbackQuery, state: FSMContext):
     await state.set_state(Form.motivation)
 
 
-@dp.callback_query(Form.hours, F.data.startswith("h_"))
+@dp.callback_query(Form.hours, F.data.in_({"h_2", "h_5", "h_10", "h_20"}))
 async def got_hours(callback: CallbackQuery, state: FSMContext):
     hours = int(callback.data.split("_")[1])
     await state.update_data(hours=hours)
