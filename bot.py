@@ -127,7 +127,7 @@ async def _validate_goal(goal: str) -> tuple[str, str, str]:
 
 
 async def _fetch_track(prompt: str) -> tuple[list[dict], str]:
-    track_text = await asyncio.to_thread(call_llm, prompt)
+    track_text = await asyncio.to_thread(call_llm, prompt, "gpt-5.5")
     logger.info(f"Track raw response (first 300): {track_text[:300]}")
     stages, summary = parse_track(track_text)
     if not stages:

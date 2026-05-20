@@ -16,12 +16,12 @@ def _get_client() -> OpenAI:
     return _client
 
 
-def call_llm(prompt: str) -> str:
+def call_llm(prompt: str, model: str = "gpt-5.4") -> str:
     client = _get_client()
     for attempt in range(3):
         try:
             response = client.chat.completions.create(
-                model="gpt-5.4",
+                model=model,
                 messages=[{"role": "user", "content": prompt}],
             )
             return response.choices[0].message.content
