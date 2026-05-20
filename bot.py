@@ -238,6 +238,7 @@ def kb_hours():
             InlineKeyboardButton(text="✏️ Ввести своё", callback_data="h_custom"),
             InlineKeyboardButton(text="Рекомендуемый план", callback_data="h_recommend"),
         ],
+        [InlineKeyboardButton(text="⬅️ Назад", callback_data="back_hours")],
     ])
 
 
@@ -252,6 +253,7 @@ def kb_months():
         [
             InlineKeyboardButton(text="✏️ Ввести своё", callback_data="m_custom"),
         ],
+        [InlineKeyboardButton(text="⬅️ Назад", callback_data="back_months")],
     ])
 
 
@@ -268,6 +270,7 @@ def kb_motivation():
         [InlineKeyboardButton(text="Новая профессия", callback_data="mot_career")],
         [InlineKeyboardButton(text="Текущая работа", callback_data="mot_work")],
         [InlineKeyboardButton(text="Личное обучение", callback_data="mot_personal")],
+        [InlineKeyboardButton(text="⬅️ Назад", callback_data="back_motivation")],
     ])
 
 
@@ -281,6 +284,7 @@ def kb_format():
             InlineKeyboardButton(text="Курсы", callback_data="fmt_courses"),
             InlineKeyboardButton(text="Любой формат", callback_data="fmt_any"),
         ],
+        [InlineKeyboardButton(text="⬅️ Назад", callback_data="back_format")],
     ])
 
 
@@ -714,6 +718,77 @@ async def got_specialization(callback: CallbackQuery, state: FSMContext):
         reply_markup=kb_motivation(),
     )
     await state.set_state(Form.motivation)
+
+
+# ── Кнопки «Назад» ────────────────────────────────────────────────────────────
+
+@dp.callback_query(Form.months, F.data == "back_months")
+async def back_from_months(callback: CallbackQuery, state: FSMContext):
+    await callback.answer()
+    try:
+        await callback.message.delete()
+    except Exception:
+        pass
+    await callback.message.answer(
+        "Сколько часов в неделю готов уделять учёбе?",
+        reply_markup=kb_hours(),
+    )
+    await state.set_state(Form.hours)
+
+
+@dp.callback_query(Form.hours, F.data == "back_hours")
+async def back_from_hours(callback: CallbackQuery, state: FSMContext):
+    await callback.answer()
+    try:
+        await callback.message.delete()
+    except Exception:
+        pass
+    data = await state.get_data()
+    if data.get("goal_scope") == "узкий":
+        await callback.message.answer("Чему хочешь научиться?")
+        await state.set_state(Form.goal)
+    else:
+        await callback.message.answer(
+            "*Какой формат материалов предпочитаешь?*",
+            reply_markup=kb_format(),
+        )
+        await state.set_state(Form.format_pref)
+
+
+@dp.callback_query(Form.format_pref, F.data == "back_format")
+async def back_from_format(callback: CallbackQuery, state: FSMContext):
+    await callback.answer()
+    try:
+        await callback.message.delete()
+    except Exception:
+        pass
+    await callback.message.answer(
+        "*Что движет тобой?* Это поможет подобрать материалы точнее.",
+        reply_markup=kb_motivation(),
+    )
+    await state.set_state(Form.motivation)
+
+
+@dp.callback_query(Form.motivation, F.data == "back_motivation")
+async def back_from_motivation(callback: CallbackQuery, state: FSMContext):
+    await callback.answer()
+    try:
+        await callback.message.delete()
+    except Exception:
+        pass
+    data = await state.get_data()
+    spec_options = data.get("spec_options", [])
+    if spec_options:
+        base_goal = data["goal"].split(" — ")[0]
+        await state.update_data(goal=base_goal)
+        await callback.message.answer(
+            f"Цель: *{escape_md(base_goal)}*\n\nУточни направление:",
+            reply_markup=kb_specialization(spec_options),
+        )
+        await state.set_state(Form.specialization)
+    else:
+        await callback.message.answer("Чему хочешь научиться?")
+        await state.set_state(Form.goal)
 
 
 @dp.callback_query(Form.hours, F.data.in_({"h_2", "h_5", "h_10", "h_20"}))
