@@ -40,7 +40,7 @@ from llm_client import call_llm
 from level import parse_questions
 from stepik import search_stepik_courses
 from youtube import search_youtube_video
-from supabase_client import save_track as _sb_save_track, update_progress as _sb_update_progress
+from supabase_client import save_track as _sb_save_track, update_progress as _sb_update_progress, update_stages as _sb_update_stages
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -1453,7 +1453,7 @@ async def stage_hard(callback: CallbackQuery, state: FSMContext):
     await callback.answer("Адаптирую под твой уровень...")
     msg = await callback.message.answer("Делаю этот этап проще...")
 
-    prompt = simplify_prompt(data["goal"], data["level"], stage["title"], stage["topics"])
+    prompt = simplify_prompt(data["goal"], data["level"], stage["title"], stage["topics"], data.get("format_pref", ""))
     try:
         result = await asyncio.to_thread(call_llm, prompt)
     except Exception:
@@ -1465,6 +1465,7 @@ async def stage_hard(callback: CallbackQuery, state: FSMContext):
     stages[idx]["materials"] = materials
     stages[idx]["modified"] = "simplified"
     await state.update_data(stages=stages)
+    asyncio.create_task(asyncio.to_thread(_sb_update_stages, callback.from_user.id, stages))
     await msg.delete()
     try:
         await _send_stage(callback.message, state, idx)
@@ -1483,7 +1484,7 @@ async def stage_easy(callback: CallbackQuery, state: FSMContext):
     await callback.answer("Усложняю материал...")
     msg = await callback.message.answer("Подбираю более продвинутые материалы...")
 
-    prompt = advance_prompt(data["goal"], data["level"], stage["title"], stage["topics"])
+    prompt = advance_prompt(data["goal"], data["level"], stage["title"], stage["topics"], data.get("format_pref", ""))
     try:
         result = await asyncio.to_thread(call_llm, prompt)
     except Exception:
@@ -1495,6 +1496,7 @@ async def stage_easy(callback: CallbackQuery, state: FSMContext):
     stages[idx]["materials"] = materials
     stages[idx]["modified"] = "advanced"
     await state.update_data(stages=stages)
+    asyncio.create_task(asyncio.to_thread(_sb_update_stages, callback.from_user.id, stages))
     await msg.delete()
     try:
         await _send_stage(callback.message, state, idx)
@@ -1513,7 +1515,7 @@ async def stage_bad(callback: CallbackQuery, state: FSMContext):
     await callback.answer("Подбираю альтернативные материалы...")
     msg = await callback.message.answer("Ищу другие материалы...")
 
-    prompt = alternative_prompt(data["goal"], data["level"], stage["title"], stage["topics"])
+    prompt = alternative_prompt(data["goal"], data["level"], stage["title"], stage["topics"], data.get("format_pref", ""))
     try:
         result = await asyncio.to_thread(call_llm, prompt)
     except Exception:
@@ -1523,6 +1525,7 @@ async def stage_bad(callback: CallbackQuery, state: FSMContext):
     stages[idx]["materials"] = result.strip()
     stages[idx]["modified"] = "alternative"
     await state.update_data(stages=stages)
+    asyncio.create_task(asyncio.to_thread(_sb_update_stages, callback.from_user.id, stages))
     await msg.delete()
     try:
         await _send_stage(callback.message, state, idx)

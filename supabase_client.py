@@ -52,6 +52,13 @@ def update_progress(user_id: int, completed: list[int], current_stage: int) -> N
     })
 
 
+def update_stages(user_id: int, stages: list) -> None:
+    _request("PATCH", f"user_tracks?user_id=eq.{user_id}", {
+        "stages": stages,
+        "updated_at": "now()",
+    })
+
+
 def get_track(user_id: int) -> dict | None:
     result = _request("GET", f"user_tracks?user_id=eq.{user_id}&select=*")
     if result and isinstance(result, list) and len(result) > 0:

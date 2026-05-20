@@ -98,9 +98,9 @@ def track_prompt(goal: str, level: str, hours: int, months: int, weeks: int, qa_
     }.get(motivation, "")
 
     format_instruction = {
-        "Видео":        "Приоритет видеоматериалам: YouTube, Rutube, VK Видео. Курсы на Stepik — только если есть видеолекции.",
-        "Статьи":       "Приоритет текстовым материалам: Habr, открытая документация.",
-        "Курсы":        "Приоритет структурированным курсам на Stepik (бесплатные).",
+        "Видео":        "ТОЛЬКО видеоматериалы: YouTube, Rutube, VK Видео. Stepik и Habr — не добавлять.",
+        "Статьи":       "ТОЛЬКО текстовые материалы: Habr, открытая документация. YouTube — не добавлять.",
+        "Курсы":        "ТОЛЬКО структурированные курсы на Stepik (бесплатные). YouTube и Habr — не добавлять.",
         "Любой формат": "Смешанный подход: разнообразие форматов и источников.",
     }.get(format_pref, "")
 
@@ -181,7 +181,12 @@ A/B → пробел в знаниях, включи в трек. C/D → уже
 {итог_instruction}"""
 
 
-def simplify_prompt(goal: str, level: str, stage_title: str, stage_content: str) -> str:
+def simplify_prompt(goal: str, level: str, stage_title: str, stage_content: str, format_pref: str = "") -> str:
+    format_instruction = {
+        "Видео":        "ТОЛЬКО видеоматериалы: YouTube, Rutube, VK Видео. Stepik и Habr — не добавлять.",
+        "Статьи":       "ТОЛЬКО текстовые материалы: Habr, открытая документация. YouTube — не добавлять.",
+        "Курсы":        "ТОЛЬКО структурированные курсы на Stepik (бесплатные).",
+    }.get(format_pref, "Смешанный подход: разнообразие форматов.")
     return f"""Пользователь изучает «{goal}» (уровень: {level}).
 
 Этап «{stage_title}» оказался слишком сложным:
@@ -193,6 +198,7 @@ def simplify_prompt(goal: str, level: str, stage_title: str, stage_content: str)
 Упрости список: разбей сложные концепции на шаги, убери лишнее. Пиши конкретно — не «основы», а конкретные термины и техники на один уровень проще.
 
 Блок 2 — материалы (сразу после тем, каждый на отдельной строке):
+ФОРМАТ МАТЕРИАЛОВ: {format_instruction}
 Предложи 2–3 простых бесплатных русскоязычных ресурса строго в формате:
 [YouTube] Название плейлиста или видео — Название канала
 [Stepik] Название курса
@@ -200,7 +206,12 @@ def simplify_prompt(goal: str, level: str, stage_title: str, stage_content: str)
 Никаких других форматов, никаких вводных фраз перед материалами."""
 
 
-def advance_prompt(goal: str, level: str, stage_title: str, stage_content: str) -> str:
+def advance_prompt(goal: str, level: str, stage_title: str, stage_content: str, format_pref: str = "") -> str:
+    format_instruction = {
+        "Видео":        "ТОЛЬКО видеоматериалы: YouTube, Rutube, VK Видео. Stepik и Habr — не добавлять.",
+        "Статьи":       "ТОЛЬКО текстовые материалы: Habr, открытая документация. YouTube — не добавлять.",
+        "Курсы":        "ТОЛЬКО структурированные курсы на Stepik (бесплатные).",
+    }.get(format_pref, "Смешанный подход: разнообразие форматов.")
     return f"""Пользователь изучает «{goal}» (уровень: {level}).
 
 Этап «{stage_title}» оказался слишком простым:
@@ -212,6 +223,7 @@ def advance_prompt(goal: str, level: str, stage_title: str, stage_content: str) 
 Углуби содержание: добавь сложные концепции, edge cases, практические задачи и мини-проекты. Пиши конкретно — специфические техники и инструменты, а не категории.
 
 Блок 2 — материалы (сразу после тем, каждый на отдельной строке):
+ФОРМАТ МАТЕРИАЛОВ: {format_instruction}
 Предложи 2–3 продвинутых бесплатных русскоязычных ресурса строго в формате:
 [YouTube] Название плейлиста или видео — Название канала
 [Stepik] Название курса
@@ -219,9 +231,15 @@ def advance_prompt(goal: str, level: str, stage_title: str, stage_content: str) 
 Никаких других форматов, никаких вводных фраз перед материалами."""
 
 
-def alternative_prompt(goal: str, level: str, stage_title: str, stage_content: str) -> str:
+def alternative_prompt(goal: str, level: str, stage_title: str, stage_content: str, format_pref: str = "") -> str:
+    format_instruction = {
+        "Видео":        "ТОЛЬКО видеоматериалы: YouTube, Rutube, VK Видео. Stepik и Habr — не добавлять.",
+        "Статьи":       "ТОЛЬКО текстовые материалы: Habr, открытая документация. YouTube — не добавлять.",
+        "Курсы":        "ТОЛЬКО структурированные курсы на Stepik (бесплатные).",
+    }.get(format_pref, "Смешанный подход: разнообразие форматов.")
     return f"""Пользователь изучает «{goal}» (уровень: {level}).
 Для этапа «{stage_title}» нужны альтернативные бесплатные материалы на русском языке.
+ФОРМАТ МАТЕРИАЛОВ: {format_instruction}
 Контекст этапа: {stage_content[:800]}
 
 Верни ТОЛЬКО 3–5 строк в формате — без вступления, без пояснений, только строки:
