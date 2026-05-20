@@ -1248,24 +1248,22 @@ async def build_track(callback: CallbackQuery, state: FSMContext):
     await state.update_data(stages=stages, summary=summary, current_stage=0, completed=[], search_terms=search_terms)
     await state.set_state(Form.track)
 
-    async def _save_to_supabase():
-        try:
-            d = await state.get_data()
-            await asyncio.to_thread(
-                _sb_save_track,
-                callback.from_user.id,
-                d.get("goal", ""),
-                d.get("level", ""),
-                d.get("hours", 0),
-                d.get("months", 0),
-                d.get("goal_scope", "широкий"),
-                stages,
-                summary,
-                d.get("skills_text", ""),
-            )
-        except Exception as e:
-            logger.warning(f"Supabase save_track failed: {e}")
-    asyncio.create_task(_save_to_supabase())
+    try:
+        d = await state.get_data()
+        await asyncio.to_thread(
+            _sb_save_track,
+            callback.from_user.id,
+            d.get("goal", ""),
+            d.get("level", ""),
+            d.get("hours", 0),
+            d.get("months", 0),
+            d.get("goal_scope", "широкий"),
+            stages,
+            summary,
+            d.get("skills_text", ""),
+        )
+    except Exception as e:
+        logger.warning(f"Supabase save_track failed: {e}")
     if summary:
         final_data = await state.get_data()
         summary_label = (
