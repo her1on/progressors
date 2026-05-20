@@ -737,6 +737,13 @@ async def got_months(callback: CallbackQuery, state: FSMContext):
 
     hours = data["hours"]
     weeks = months * 4
+    if data.get("goal_scope") == "узкий" and months >= 6:
+        await callback.message.answer(
+            f"⚠️ Для узкой цели обычно достаточно *1–3 месяца*.\n\n"
+            f"Ты выбрал {months} мес. — продолжить или изменить?",
+            reply_markup=kb_time_warning(),
+        )
+        return
     if data.get("goal_scope") != "узкий" and hours * weeks < 20:
         await callback.message.answer(
             f"⚠️ *{hours} ч/нед × {months} мес = {hours * weeks} ч* — это немного для твоей цели.\n\n"
