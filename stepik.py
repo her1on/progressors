@@ -1,7 +1,10 @@
 import requests
 
 
-def search_stepik_courses(query: str, budget: int, limit: int = 5) -> list[dict[str, str | int]]:
+_DIFFICULTY_RANK = {"easy": 0, "medium": 1, "hard": 2}
+
+
+def search_stepik_courses(query: str, budget: int, limit: int = 5, difficulty: str | None = None) -> list[dict[str, str | int]]:
     url = "https://stepik.org/api/courses"
     params = {
         "search": query,
@@ -36,8 +39,12 @@ def search_stepik_courses(query: str, budget: int, limit: int = 5) -> list[dict[
             "title": title,
             "url": f"https://stepik.org/course/{course.get('id')}/promo",
             "price": int(price),
-            "learners": learners
+            "learners": learners,
+            "difficulty": (course.get("difficulty") or "").lower(),
         })
+
+    if difficulty and any(c["difficulty"] == difficulty for c in filtered):
+        filtered = [c for c in filtered if c["difficulty"] == difficulty]
 
     paid = sorted([c for c in filtered if c["price"] >= 500], key=lambda c: c["price"], reverse=True)[:2]
     free = sorted([c for c in filtered if c["price"] == 0], key=lambda c: c["learners"], reverse=True)

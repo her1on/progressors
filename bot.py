@@ -1265,12 +1265,12 @@ async def _resolve_youtube_links(text: str, used_ids: set[str], max_videos: int 
     return text
 
 
-async def _resolve_stepik_links(text: str) -> str:
+async def _resolve_stepik_links(text: str, difficulty: str | None = None) -> str:
     """Заменяет поисковые ссылки Stepik на прямые URL через API."""
     stepik_pattern = re.compile(r"\[Stepik: ([^\]]+)\]\((https://stepik\.org/search\?query=[^)]+)\)")
     for title, search_url in stepik_pattern.findall(text):
         try:
-            courses = await asyncio.to_thread(search_stepik_courses, title, 0, 1)
+            courses = await asyncio.to_thread(search_stepik_courses, title, 0, 1, difficulty)
             if courses:
                 direct_url = courses[0]["url"]
                 text = text.replace(search_url, direct_url)
@@ -1297,10 +1297,12 @@ async def _send_stage(message: Message, state: FSMContext, idx: int, edit: bool 
     stage = stages[idx]
     is_last = idx == len(stages) - 1
     used_ids: set[str] = set(data.get("used_video_ids", []))
+    stage_difficulty = {"simplified": "easy", "advanced": "hard"}.get(stage.get("modified", ""))
+
     text = format_stage(stage, idx, len(stages))
     text = await _resolve_youtube_links(text, used_ids)
     await state.update_data(used_video_ids=list(used_ids))
-    text = await _resolve_stepik_links(text)
+    text = await _resolve_stepik_links(text, stage_difficulty)
 
     format_pref = data.get("format_pref", "")
     if format_pref in ("Курсы", "Любой формат", ""):
@@ -1316,8 +1318,8 @@ async def _send_stage(message: Message, state: FSMContext, idx: int, edit: bool 
         courses = []
         for query in queries:
             try:
-                found = await asyncio.to_thread(search_stepik_courses, query, 0, 3)
-                logger.info(f"Stepik search for {query!r}: found {len(found)} courses")
+                found = await asyncio.to_thread(search_stepik_courses, query, 0, 3, stage_difficulty)
+                logger.info(f"Stepik search for {query!r} (difficulty={stage_difficulty}): found {len(found)} courses")
                 if found:
                     courses = found
                     break
