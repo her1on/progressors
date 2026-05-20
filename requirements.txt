@@ -4,4 +4,4 @@ requests
 fastapi
 uvicorn[standard]
 aiogram==3.13.1
-redis[asyncio]
+redis
