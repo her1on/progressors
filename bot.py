@@ -1151,6 +1151,9 @@ async def stage_done(callback: CallbackQuery, state: FSMContext):
     if is_last:
         skipped = [i for i in range(idx) if i not in completed]
         if skipped:
+            if idx not in completed:
+                completed.append(idx)
+            await state.update_data(completed=completed)
             await callback.answer()
             await callback.message.answer(
                 f"⚠️ Ты пропустил {len(skipped)} этап(а). Хочешь завершить маршрут?",
@@ -1166,7 +1169,10 @@ async def stage_done(callback: CallbackQuery, state: FSMContext):
     await state.update_data(completed=completed, current_stage=idx + 1)
     await callback.message.edit_reply_markup(reply_markup=None)
     await callback.answer("✅ Отмечено как пройденное!")
-    await _send_stage(callback.message, state, idx + 1)
+    next_idx = idx + 1
+    if len(completed) >= len(stages):
+        next_idx = len(stages)
+    await _send_stage(callback.message, state, next_idx)
 
 
 @dp.callback_query(Form.track, F.data.startswith("finish_anyway_"))
