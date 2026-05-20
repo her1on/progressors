@@ -67,6 +67,7 @@ QUIZ_OPTIONS = [
 # Хранилище фоновых задач (user_id → asyncio.Task)
 _questions_tasks: dict[int, asyncio.Task] = {}
 _track_tasks: dict[int, asyncio.Task] = {}
+_search_term_tasks: dict[int, asyncio.Task] = {}
 
 
 async def _typing_loop(chat_id: int, stop: asyncio.Event) -> None:
@@ -124,6 +125,20 @@ async def _validate_goal(goal: str) -> tuple[str, str, str]:
     if "ИНСТИТУЦИОНАЛЬНЫЙ" in first:
         return "institutional", explanation, "широкий"
     return "ok", "", "широкий"
+
+
+async def _extract_search_terms(goal: str) -> str:
+    """Извлекает 2-3 ключевых слова из цели для поиска курсов на Stepik."""
+    prompt = (
+        "Извлеки 2-3 главных ключевых слова из учебной цели для поиска курсов. "
+        "Отвечай только словами через пробел, без знаков препинания, без пояснений.\n"
+        f"Цель: {goal}"
+    )
+    try:
+        raw = await asyncio.to_thread(call_llm, prompt)
+        return raw.strip().splitlines()[0].strip()
+    except Exception:
+        return goal.split("—")[0].strip()
 
 
 async def _fetch_track(prompt: str) -> tuple[list[dict], str]:
@@ -445,7 +460,7 @@ def format_stage(stage: dict, idx: int, total: int) -> str:
 # ── Handlers ──────────────────────────────────────────────────────────────────
 
 def _cancel_user_tasks(user_id: int) -> None:
-    for store in (_questions_tasks, _track_tasks):
+    for store in (_questions_tasks, _track_tasks, _search_term_tasks):
         task = store.pop(user_id, None)
         if task and not task.done():
             task.cancel()
@@ -694,6 +709,7 @@ async def _proceed_after_months(callback: CallbackQuery, state: FSMContext, data
         )
         track_task = asyncio.create_task(_fetch_track(prompt))
         _track_tasks[user_id] = track_task
+        _search_term_tasks[user_id] = asyncio.create_task(_extract_search_terms(data["goal"]))
         await callback.message.answer(
             f"*Цель:* {escape_md(data['goal'])}\n"
             f"*Время:* {data['hours']} ч/нед · {data['months']} мес",
@@ -873,6 +889,7 @@ async def got_answer(callback: CallbackQuery, state: FSMContext):
     )
     track_task = asyncio.create_task(_fetch_track(prompt))
     _track_tasks[callback.from_user.id] = track_task
+    _search_term_tasks[callback.from_user.id] = asyncio.create_task(_extract_search_terms(data["goal"]))
 
     motivation = data.get("motivation", "")
     format_pref = data.get("format_pref", "")
@@ -948,7 +965,19 @@ async def build_track(callback: CallbackQuery, state: FSMContext):
     except Exception:
         pass
 
-    await state.update_data(stages=stages, summary=summary, current_stage=0, completed=[])
+    search_task = _search_term_tasks.pop(user_id, None)
+    final_data = await state.get_data()
+    search_terms = final_data.get("goal", "").split("—")[0].strip()
+    if search_task:
+        if search_task.done() and not search_task.exception():
+            search_terms = search_task.result()
+        else:
+            try:
+                search_terms = await asyncio.wait_for(asyncio.shield(search_task), timeout=10)
+            except Exception as e:
+                logger.warning(f"search_terms extraction timed out: {e}")
+
+    await state.update_data(stages=stages, summary=summary, current_stage=0, completed=[], search_terms=search_terms)
     await state.set_state(Form.track)
     if summary:
         final_data = await state.get_data()
@@ -1021,16 +1050,30 @@ async def _send_stage(message: Message, state: FSMContext, idx: int, edit: bool 
 
     format_pref = data.get("format_pref", "")
     if format_pref in ("Курсы", "Любой формат", ""):
-        try:
-            courses = await asyncio.to_thread(search_stepik_courses, data.get("goal", stage["title"]), 0, 3)
-            logger.info(f"Stepik search for {data.get('goal')!r}: found {len(courses)} courses")
-            if courses:
-                lines = ["\n*Курсы на Stepik по этому этапу:*\n"]
-                for c in courses:
-                    lines.append(f"• [{c['title']}]({c['url']})")
-                text = text + "\n".join(lines)
-        except Exception as e:
-            logger.warning(f"Stepik search failed: {e}")
+        terms = data.get("search_terms") or data.get("goal", stage["title"])
+        words = terms.split()
+        seen: set[str] = set()
+        queries = []
+        for n in (3, 2, 1):
+            q = " ".join(words[:n])
+            if q and q not in seen:
+                seen.add(q)
+                queries.append(q)
+        courses = []
+        for query in queries:
+            try:
+                found = await asyncio.to_thread(search_stepik_courses, query, 0, 3)
+                logger.info(f"Stepik search for {query!r}: found {len(found)} courses")
+                if found:
+                    courses = found
+                    break
+            except Exception as e:
+                logger.warning(f"Stepik search failed for {query!r}: {e}")
+        if courses:
+            lines = ["\n*Курсы на Stepik:*\n"]
+            for c in courses:
+                lines.append(f"• [{c['title']}]({c['url']})")
+            text = text + "\n".join(lines)
 
     # Удаляем предыдущее сообщение этапа если он был изменён
     if stage.get("modified"):
