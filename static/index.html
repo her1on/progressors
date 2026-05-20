@@ -2241,84 +2241,28 @@ function Constellation({ stages, activeId, completedIds, onPick }) {
 }
 
 // ─── Stage detail panel ────────────────────────────────────────────────
-function StageDetail({ stage, goal, level, isLocked, completed, onComplete, onUnlock, savedTask, setTasksByStage }) {
-  const [taskOpen, setTaskOpen]         = useStateT(false);
-  const [taskText, setTaskText]         = useStateT("");
-  const [answer, setAnswer]             = useStateT("");
-  const [feedback, setFeedback]         = useStateT(null);
-  const [feedbackText, setFeedbackText] = useStateT("");
-  const [loadingTask, setLoadingTask]   = useStateT(false);
-  const [loadingFb, setLoadingFb]       = useStateT(false);
-  const [confirmPending, setConfirmPending] = useStateT(false);
+const _MAT_URLS = {
+  youtube: 'https://www.youtube.com/results?search_query={}',
+  stepik:  'https://stepik.org/catalog?q={}',
+  habr:    'https://habr.com/ru/search/?q={}',
+  rutube:  'https://rutube.ru/search/?query={}',
+  vk:      'https://vk.com/video?q={}',
+};
+function parseMaterials(text) {
+  if (!text) return [];
+  return text.split('\n').map(line => {
+    const m = line.match(/\[([^\]\n]+)\]\s+([^\n]+)/);
+    if (!m) return null;
+    const source = m[1].trim();
+    const title = m[2].trim().split(' — ')[0].trim();
+    const base = _MAT_URLS[source.toLowerCase()];
+    if (!base || !title) return null;
+    return { source, title, url: base.replace('{}', encodeURIComponent(title)) };
+  }).filter(Boolean);
+}
 
-  // Ref всегда хранит актуальный стейт задания — читается в cleanup
-  const taskStateRef = useRefT({});
-  useEffectT(() => {
-    taskStateRef.current = { taskText, taskOpen, answer, feedback, feedbackText };
-  });
-
-  // При смене этапа: сохраняем стейт старого (через cleanup), загружаем нового
-  useEffectT(() => {
-    const saved = savedTask || {};
-    setTaskOpen(!!saved.taskText);
-    setTaskText(saved.taskText || "");
-    setAnswer(saved.answer || "");
-    setFeedback(saved.feedback || null);
-    setFeedbackText(saved.feedbackText || "");
-    setConfirmPending(false);
-    return () => {
-      // cleanup: stage.id здесь — это OLD id (замыкание)
-      const sid = stage.id;
-      setTasksByStage(prev => ({ ...prev, [sid]: taskStateRef.current }));
-    };
-  }, [stage.id]);
-
-  const getTask = async () => {
-    setLoadingTask(true);
-    try {
-      const res = await fetch("/api/task", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          goal: goal || "обучение",
-          level: level,
-          stage_title: stage.title,
-          stage_content: (stage.topics || []).map(t => t.html).join("; ").slice(0, 400),
-        }),
-      });
-      const data = await res.json();
-      setTaskText(data.task || "Ошибка при генерации задания.");
-    } catch(e) {
-      setTaskText("Ошибка при генерации задания. Попробуй ещё раз.");
-    }
-    setLoadingTask(false);
-  };
-
-  const check = async () => {
-    const len = answer.trim().length;
-    if (len === 0) return;
-    setLoadingFb(true);
-    try {
-      const res = await fetch("/api/feedback", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          goal: goal || "обучение",
-          level: level,
-          task: taskText || stage.task || "",
-          answer: answer,
-        }),
-      });
-      const data = await res.json();
-      setFeedback(data.verdict);
-      setFeedbackText(data.text || "");
-    } catch(e) {
-      setFeedback("bad");
-      setFeedbackText("Ошибка при проверке ответа. Попробуй ещё раз.");
-    }
-    setLoadingFb(false);
-  };
-
+function StageDetail({ stage, goal, level, isLocked, completed, onComplete, onUnlock }) {
+  const mats = parseMaterials(stage.materialsText);
   return (
     <div className="stage-detail">
       <div className="panel stage-detail-head">
@@ -2330,12 +2274,10 @@ function StageDetail({ stage, goal, level, isLocked, completed, onComplete, onUn
           {isLocked && <span className="chip">⚿ заблокирован</span>}
         </div>
         <h3 className="display-3">{stage.title}</h3>
-        <p className="summary">{stage.summary}</p>
-
         {isLocked && (
           <div className="warn-banner">
             <span>⚠️</span>
-            <span>Этот этап откроется автоматически, когда ты завершишь предыдущий. Можно забежать вперёд — но материал будет проще, если идти по порядку.</span>
+            <span>Этот этап откроется автоматически, когда ты завершишь предыдущий.</span>
           </div>
         )}
       </div>
@@ -2348,67 +2290,29 @@ function StageDetail({ stage, goal, level, isLocked, completed, onComplete, onUn
               <li key={i}><span dangerouslySetInnerHTML={{ __html: t.html }} /></li>
             ))}
           </ul>
-          <div className="outcome">
-            <b>Результат этапа.</b> <span dangerouslySetInnerHTML={{ __html: stage.outcome }} />
-          </div>
+          {stage.outcome && (
+            <div className="outcome">
+              <b>Результат этапа.</b> <span dangerouslySetInnerHTML={{ __html: stage.outcome }} />
+            </div>
+          )}
         </div>
 
-      </div>
-
-      <div className="panel task-card">
-        <h4 style={{ marginTop: 0, marginBottom: 14, fontFamily: "var(--ff-display)", fontWeight: 600, fontSize: 16, display: "flex", alignItems: "center", gap: 10 }}>
-          <span className="pip" style={{ background: "var(--acc-3)", boxShadow: "0 0 10px var(--acc-3)" }} />
-          Практическое задание
-        </h4>
-        {!taskOpen ? (
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
-            <div style={{ color: "var(--fg-soft)", fontSize: 14, lineHeight: 1.5, maxWidth: "62ch" }}>
-              ИИ сгенерирует задание под текущий этап и уровень <b style={{ color: "var(--fg)" }}>{level}</b>. Ответишь текстом — получишь развёрнутый фидбек.
+        {mats.length > 0 && (
+          <div className="panel section-card">
+            <h4><span className="pip" /> Материалы</h4>
+            <div className="course-list">
+              {mats.map((m, i) => (
+                <a key={i} className="course" href={m.url} target="_blank" rel="noreferrer">
+                  <div className="course-platform" data-p={m.source.toLowerCase()}>{PLAT_SHORT[m.source.toLowerCase()] || m.source[0]}</div>
+                  <div className="course-info">
+                    <div className="course-name">{m.title}</div>
+                    <div className="course-plat-name">{m.source}</div>
+                  </div>
+                  <div className="course-price">→</div>
+                </a>
+              ))}
             </div>
-            <button className="btn" onClick={() => { setTaskOpen(true); if (!taskText) getTask(); }} disabled={loadingTask}>
-              {loadingTask ? "Генерирую задание…" : "🎯 Получить задание"}
-            </button>
           </div>
-        ) : (
-          <>
-            <div className="task-prompt">
-              <b>Задание · </b>
-              <span>{taskText || stage.task}</span>
-            </div>
-            <textarea
-              className="task-textarea"
-              placeholder="Введи свой ответ. Чем подробнее распишешь логику — тем точнее ИИ оценит."
-              value={answer}
-              onChange={(e) => setAnswer(e.target.value)}
-            />
-            <div className="task-footer">
-              <button className="btn btn-ghost btn-sm" onClick={() => { setTaskOpen(false); setAnswer(""); setFeedback(null); }}>
-                ← Скрыть
-              </button>
-              <button className="btn btn-primary btn-sm" onClick={check} disabled={loadingFb}>
-                {loadingFb ? "Проверяю…" : "Проверить ответ"}
-              </button>
-            </div>
-
-            {feedback === "good" && (
-              <div className="feedback feedback-good">
-                <span className="feedback-verdict">● Верно</span>
-                <span style={{ whiteSpace: "pre-line" }}>{feedbackText}</span>
-              </div>
-            )}
-            {feedback === "warn" && (
-              <div className="feedback feedback-warn">
-                <span className="feedback-verdict">◐ Частично</span>
-                <span style={{ whiteSpace: "pre-line" }}>{feedbackText}</span>
-              </div>
-            )}
-            {feedback === "bad" && (
-              <div className="feedback feedback-bad">
-                <span className="feedback-verdict">✕ Неверно</span>
-                <span style={{ whiteSpace: "pre-line" }}>{feedbackText}</span>
-              </div>
-            )}
-          </>
         )}
       </div>
 
@@ -2420,17 +2324,9 @@ function StageDetail({ stage, goal, level, isLocked, completed, onComplete, onUn
         )}
         <span className="spacer" />
         {!completed ? (
-          confirmPending ? (
-            <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-              <span style={{ fontSize: 13, color: "var(--fg-soft)", fontFamily: "var(--ff-mono)" }}>Задание не выполнено. Продолжить?</span>
-              <button className="btn btn-primary" style={{ padding: "6px 16px" }} onClick={() => { setConfirmPending(false); onComplete(); }}>Да</button>
-              <button className="btn btn-ghost" style={{ padding: "6px 16px" }} onClick={() => setConfirmPending(false)}>Отмена</button>
-            </div>
-          ) : (
-            <button className="btn btn-primary" onClick={() => { feedback === null ? setConfirmPending(true) : onComplete(); }} disabled={isLocked}>
-              ✓ Отметить пройденным
-            </button>
-          )
+          <button className="btn btn-primary" onClick={onComplete} disabled={isLocked}>
+            ✓ Отметить пройденным
+          </button>
         ) : (
           <button className="btn btn-ghost" onClick={onComplete}>
             Снять отметку
@@ -2498,7 +2394,6 @@ function TrackScreen({ state, setState, onRestart }) {
   const [unlocked, setUnlocked]         = useStateT([firstId]);
   const [toast, setToast]               = useStateT(null);
   const [showComplete, setShowComplete] = useStateT(false);
-  const [tasksByStage, setTasksByStage] = useStateT({});
 
   useEffectT(() => {
     if (STAGES.length > 0 && completed.length === STAGES.length) {
@@ -2574,13 +2469,11 @@ function TrackScreen({ state, setState, onRestart }) {
     <div className="track">
       <div className="track-header">
         <div className="track-header-left">
-          <div className="eyebrow" style={{ marginBottom: 8 }}>Шаг 04 / 04 · персональный трек</div>
           <h2 className="display-2">{state.goal}</h2>
           <div className="track-meta-row" style={{ marginTop: 12 }}>
             <span className="chip chip-lvl">★ {lvl.short}</span>
             <span className="chip">{state.hours} ч/нед</span>
             <span className="chip">{state.months} мес</span>
-            <span className="chip">{state.budget === 0 ? "бесплатно" : `${state.budget} ₽/мес`}</span>
             <span className="chip">{STAGES.length} этапов</span>
           </div>
         </div>
@@ -2609,63 +2502,8 @@ function TrackScreen({ state, setState, onRestart }) {
           completed={completed.includes(activeStage.id)}
           onComplete={onComplete}
           onUnlock={onUnlock}
-          savedTask={tasksByStage[activeStage.id] || {}}
-          setTasksByStage={setTasksByStage}
         />
       </div>
-
-      <div className="panel panel-pad" style={{ marginTop: 24 }}>
-          <h3 style={{ fontFamily: "var(--ff-display)", fontSize: 18, fontWeight: 700, marginBottom: 16, marginTop: 0 }}>
-            Курсы по теме
-          </h3>
-          {state.courses?.stepik?.length > 0 && (
-            <div style={{ marginBottom: 16 }}>
-              <div className="eyebrow" style={{ marginBottom: 10 }}>Stepik</div>
-              <div className="course-list">
-                {state.courses.stepik.map((c, i) => (
-                  <a key={i} className="course" href={c.url} target="_blank" rel="noreferrer">
-                    <div className="course-platform" data-p="stepik">St</div>
-                    <div className="course-info">
-                      <div className="course-name">{c.title}</div>
-                      <div className="course-plat-name">Stepik</div>
-                    </div>
-                    <div className="course-price" data-free={c.price === 0}>
-                      {c.price === 0 ? "бесплатно" : c.price ? `${c.price} ₽` : "→"}
-                    </div>
-                  </a>
-                ))}
-              </div>
-            </div>
-          )}
-          {state.courses?.platforms?.length > 0 && (
-            <div style={{ marginBottom: 16 }}>
-              <div className="eyebrow" style={{ marginBottom: 10 }}>Крупные платформы</div>
-              <div className="course-list">
-                {state.courses.platforms.map((c, i) => (
-                  <a key={i} className="course" href={c.url} target="_blank" rel="noreferrer">
-                    <div className="course-platform" data-p={c.plat}>{PLAT_SHORT[c.plat] || c.name[0]}</div>
-                    <div className="course-info">
-                      <div className="course-name">{c.title}</div>
-                      <div className="course-plat-name">{c.name}</div>
-                    </div>
-                    <div className="course-price">→</div>
-                  </a>
-                ))}
-              </div>
-            </div>
-          )}
-          <div className="eyebrow" style={{ marginBottom: 10 }}>Rutube</div>
-          <div className="course-list">
-            <a className="course" href={`https://rutube.ru/search/?query=${encodeURIComponent(state.goal)}`} target="_blank" rel="noreferrer">
-              <div className="course-platform" data-p="rutube">Ru</div>
-              <div className="course-info">
-                <div className="course-name">Видео по теме «{state.goal}»</div>
-                <div className="course-plat-name">Rutube · поиск</div>
-              </div>
-              <div className="course-price">→</div>
-            </a>
-          </div>
-        </div>
 
       {toast && <div className="toast">{toast}</div>}
     </div>
@@ -2708,10 +2546,10 @@ function transformBotStages(botStages, completed, currentStage) {
       title: s.title,
       weeks: s.weeks,
       state: stageState,
-      summary: (s.topics || "").slice(0, 220),
+      summary: s.outcome || "",
       topics: topicsArr,
       outcome: s.outcome || "",
-      task: "",
+      materialsText: s.materials || "",
       final: idx === (botStages.length - 1),
     };
   });
