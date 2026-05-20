@@ -43,9 +43,9 @@ def search_stepik_courses(query: str, budget: int, limit: int = 5, difficulty: s
             "difficulty": (course.get("difficulty") or "").lower(),
         })
 
-    # relevance filter: use filter_terms (full original query) when provided,
-    # otherwise fall back to query. This prevents shortened queries like "двойные"
-    # from matching "Двойные диаграммы состояния" when searching for "двойные интегралы".
+    # Фильтр релевантности: используем filter_terms (полный исходный запрос), если передан.
+    # Это исключает ложные совпадения — например, сокращённый запрос "двойные"
+    # не должен находить "Двойные диаграммы состояния" вместо курсов по интегралам.
     key_words = [w.lower() for w in (filter_terms or query).split() if len(w) > 4]
     if key_words:
         relevant = [c for c in filtered if any(kw in c["title"].lower() for kw in key_words)]

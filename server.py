@@ -26,7 +26,7 @@ BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
 
 app = FastAPI(title="Прогрессоры Mini App")
 
-# ── Telegram Mini App ─────────────────────────────────────────────────────────
+# ── Telegram Mini App ───────────────────────────────────────────────────────
 
 def _verify_init_data(init_data: str) -> int:
     if not BOT_TOKEN:
@@ -54,7 +54,7 @@ class ProgressRequest(BaseModel):
 
 class StageFeedbackRequest(BaseModel):
     stage_idx: int
-    feedback: str  # "liked" | "disliked"
+    feedback: str  # "liked" или "disliked"
 
 
 _SEARCH_URLS = {
@@ -71,7 +71,7 @@ async def _parse_materials_with_links(materials: str) -> list[dict]:
             continue
         source = m.group(1).strip()
         if source.lower() == "stepik":
-            continue  # added separately via Stepik API
+            continue  # добавляется отдельно через Stepik API
         rest = m.group(2).strip()
         title = rest.split(" — ")[0].strip()
         base = _SEARCH_URLS.get(source.lower())
@@ -163,7 +163,7 @@ async def webapp_stage_feedback(req: StageFeedbackRequest, x_init_data: str = He
     return {"ok": True}
 
 
-# ── Static files ──────────────────────────────────────────────────────────────
+# ── Статические файлы ────────────────────────────────────────────────────────
 
 STATIC_DIR = Path(__file__).parent / "static"
 STATIC_DIR.mkdir(exist_ok=True)
