@@ -779,7 +779,7 @@ async def got_months(callback: CallbackQuery, state: FSMContext):
     await _proceed_after_months(callback, state, data)
 
 
-@dp.callback_query(Form.months, F.data == "time_ok")
+@dp.callback_query(F.data == "time_ok")
 async def time_warning_ok(callback: CallbackQuery, state: FSMContext):
     data = await state.get_data()
     await callback.answer()
@@ -787,10 +787,11 @@ async def time_warning_ok(callback: CallbackQuery, state: FSMContext):
         await callback.message.delete()
     except Exception:
         pass
+    await state.set_state(Form.months)
     await _proceed_after_months(callback, state, data)
 
 
-@dp.callback_query(Form.months, F.data == "time_change")
+@dp.callback_query(F.data == "time_change")
 async def time_warning_change(callback: CallbackQuery, state: FSMContext):
     await callback.answer()
     try:
@@ -798,10 +799,10 @@ async def time_warning_change(callback: CallbackQuery, state: FSMContext):
     except Exception:
         pass
     await callback.message.answer(
-        "Сколько часов в неделю готов уделять учёбе?",
-        reply_markup=kb_hours(),
+        "За сколько месяцев хочешь достичь цели?",
+        reply_markup=kb_months(),
     )
-    await state.set_state(Form.hours)
+    await state.set_state(Form.months)
 
 
 @dp.callback_query(Form.motivation, F.data.startswith("mot_"))
