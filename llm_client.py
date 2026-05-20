@@ -16,7 +16,7 @@ def _get_client() -> OpenAI:
     return _client
 
 
-def call_llm(prompt: str, model: str = "gpt-5.4") -> str:
+def call_llm(prompt: str, model: str = "gpt-5.5") -> str:
     client = _get_client()
     for attempt in range(3):
         try:

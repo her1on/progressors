@@ -5,7 +5,7 @@ Telegram бот, персональный ИИ-навигатор по обуч�
 
 ## Критические правила
 
-- **НИКОГДА не менять LLM модель без явного разрешения пользователя. Модель: `gpt-5.4`**
+- **НИКОГДА не менять LLM модель без явного разрешения пользователя. Модель: `gpt-5.5`**
 - Все ответы — на русском языке
 - Хостинг: **Render** (progressors.onrender.com) — деплой при push в ветку `telegram-bot`
 - Railway мигрировали с него из-за outage (Google Cloud заблокировал аккаунт)
@@ -13,7 +13,7 @@ Telegram бот, персональный ИИ-навигатор по обуч�
 ## Технический стек
 
 - Python 3.13, aiogram 3.13.1, webhook на Render
-- Codex API (OpenAI-совместимый), модель `gpt-5.4`, base_url `https://codex.sale/v1`
+- Codex API (OpenAI-совместимый), модель `gpt-5.5`, base_url `https://codex.sale/v1`
 - YouTube Data API v3 — верификация видео (реальные ссылки через API)
 - Stepik публичный API — верификация курсов
 - Redis (RedisStorage) — FSM persistence между деплоями (если REDIS_URL задан)
