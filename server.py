@@ -71,18 +71,21 @@ async def _parse_materials_with_links(materials: str) -> list[dict]:
         if not base or not title:
             continue
         url = base.format(urllib.parse.quote_plus(title))
+        thumb = None
         if source.lower() == "youtube":
             if title in _yt_cache:
-                url = _yt_cache[title]
+                url, vid_id = _yt_cache[title]
+                thumb = f"https://img.youtube.com/vi/{vid_id}/mqdefault.jpg"
             else:
                 try:
                     res = await asyncio.to_thread(search_youtube_video, title)
                     if res:
-                        url, _ = res
-                        _yt_cache[title] = url
+                        url, vid_id = res
+                        _yt_cache[title] = (url, vid_id)
+                        thumb = f"https://img.youtube.com/vi/{vid_id}/mqdefault.jpg"
                 except Exception:
                     pass
-        result.append({"source": source, "title": title, "url": url})
+        result.append({"source": source, "title": title, "url": url, "thumb": thumb})
     return result
 
 
