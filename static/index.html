@@ -13,6 +13,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Manrope:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
   <style>
 /* ─── Прогрессоры • cosmic design system ───────────────────────────── */
 
@@ -3071,6 +3072,30 @@ const ACCENT_PRESETS = {
   ion:       { "--acc-1": "#6df0a8", "--acc-2": "#5cc7ff", "--acc-3": "#c9f76d", "--grad-aurora": "linear-gradient(135deg, #6df0a8 0%, #5cc7ff 60%, #c9f76d 120%)" },
 };
 
+function transformBotStages(botStages, completed, currentStage) {
+  const PLANETS = ["earth", "mars", "jupiter", "neptune"];
+  return (botStages || []).map((s, idx) => {
+    const topicsArr = (s.topics || "").split("\n")
+      .map(l => l.trim().replace(/^[-•*·]\s*/, ""))
+      .filter(l => l.length > 5)
+      .slice(0, 6)
+      .map(l => ({ html: l.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;") }));
+    const stageState = (completed || []).includes(idx) ? "done" : (idx === (currentStage || 0) ? "current" : "locked");
+    return {
+      id: s.id || idx + 1,
+      planet: idx === (botStages.length - 1) ? "star" : PLANETS[idx % PLANETS.length],
+      title: s.title,
+      weeks: s.weeks,
+      state: stageState,
+      summary: (s.topics || "").slice(0, 220),
+      topics: topicsArr,
+      outcome: s.outcome || "",
+      task: "",
+      final: idx === (botStages.length - 1),
+    };
+  });
+}
+
 function App() {
   const [t, setTweak] = useTweaks(TWEAK_DEFAULTS);
 
@@ -3102,6 +3127,30 @@ function App() {
 
   // step machine — landing only shown on first visit (no saved session)
   const [step, setStep] = useState(saved?.step || "landing");
+  const [tgInitData, setTgInitData] = useState("");
+
+  // Telegram Mini App: load track from Supabase on mount
+  useEffect(() => {
+    const tg = window.Telegram?.WebApp;
+    if (!tg?.initData) return;
+    tg.ready();
+    tg.expand();
+    setTgInitData(tg.initData);
+    setLoading(true);
+    setLoadingMsg("Загружаем твой трек…");
+    fetch("/api/webapp/track", { headers: { "X-Init-Data": tg.initData } })
+      .then(r => { if (!r.ok) throw new Error(r.status); return r.json(); })
+      .then(data => {
+        const stages = transformBotStages(data.stages || [], data.completed || [], data.current_stage || 0);
+        setState(prev => ({ ...prev, goal: data.goal || "", level: data.level || "", hours: data.hours || 0, months: data.months || 0, stages, courses: {} }));
+        setStep("track");
+        setLoading(false);
+      })
+      .catch(() => {
+        setLoading(false);
+        setError("Трек не найден. Пройди онбординг в боте и нажми «📱 Открыть трек».");
+      });
+  }, []);
   const [loading, setLoading] = useState(false);
   const [loadingMsg, setLoadingMsg] = useState("");
   const [error, setError] = useState("");
