@@ -973,7 +973,7 @@ async def _proceed_after_months(message: Message, user_id: int, state: FSMContex
             )
         else:
             skills_line = f"\n*Навыки:* {escape_md(data['skills_text'])}" if data.get("skills_text") else ""
-        profile_text = (
+            profile_text = (
                 f"*Твой профиль*\n\n"
                 f"*Цель:* {escape_md(data['goal'])}\n"
                 f"*Уровень:* {level}{skills_line}\n\n"
