@@ -284,7 +284,7 @@ def linkify_materials(text: str, stage_topic: str = "") -> str:
     filtered = []
     for line in text.split("\n"):
         m = re.search(r"\[([^\]\n]+)\]", line)
-        if m and m.group(1).strip().lower() not in _SOURCE_SEARCH:
+        if not m or m.group(1).strip().lower() not in _SOURCE_SEARCH:
             continue
         filtered.append(line)
     text = "\n".join(filtered)
