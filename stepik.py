@@ -1,7 +1,9 @@
+import re
 import requests
 
 
 _DIFFICULTY_RANK = {"easy": 0, "medium": 1, "hard": 2}
+_SCHOOL_RE = re.compile(r'\d+\s*класс', re.IGNORECASE)
 
 
 def search_stepik_courses(query: str, budget: int, limit: int = 5, difficulty: str | None = None, filter_terms: str | None = None) -> list[dict[str, str | int]]:
@@ -42,6 +44,9 @@ def search_stepik_courses(query: str, budget: int, limit: int = 5, difficulty: s
             "learners": learners,
             "difficulty": (course.get("difficulty") or "").lower(),
         })
+
+    # Исключаем школьные курсы с указанием класса ("2 класс", "10 класс" и т.п.)
+    filtered = [c for c in filtered if not _SCHOOL_RE.search(c["title"])]
 
     # Фильтр релевантности: используем filter_terms (полный исходный запрос), если передан.
     # Это исключает ложные совпадения — например, сокращённый запрос "двойные"
