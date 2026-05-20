@@ -277,8 +277,10 @@ _SOURCE_SEARCH = {
 }
 
 
-def linkify_materials(text: str) -> str:
+def linkify_materials(text: str, stage_topic: str = "") -> str:
     """Превращает [YouTube] Название — Канал в кликабельную ссылку на поиск."""
+    habr_query = " ".join(stage_topic.split()[:3]) if stage_topic else ""
+
     def replace(m: re.Match) -> str:
         source = m.group(1).strip()
         rest = m.group(2).strip()
@@ -288,7 +290,10 @@ def linkify_materials(text: str) -> str:
         base = _SOURCE_SEARCH.get(source.lower())
         if not base or not title:
             return m.group(0)
-        query = " ".join(title.split()[:4]) if source.lower() == "habr" else title
+        if source.lower() == "habr":
+            query = habr_query or " ".join(title.split()[:3])
+        else:
+            query = title
         url = base.format(urllib.parse.quote_plus(query))
         return f"[{source}: {title}]({url})"
 
@@ -423,7 +428,7 @@ def format_stage(stage: dict, idx: int, total: int) -> str:
         materials = _limit_source_lines(materials, "YouTube", 2)
         materials = _limit_source_lines(materials, "GitHub", 0)
         if materials:
-            text += f"*Материалы:*\n{linkify_materials(materials)}\n\n"
+            text += f"*Материалы:*\n{linkify_materials(materials, stage['title'])}\n\n"
     if stage.get("outcome"):
         text += f"*Результат:* _{stage['outcome']}_"
     return text[:4000]
@@ -1010,16 +1015,14 @@ async def _send_stage(message: Message, state: FSMContext, idx: int, edit: bool 
     if format_pref in ("Курсы", "Любой формат", ""):
         try:
             courses = await asyncio.to_thread(search_stepik_courses, data.get("goal", stage["title"]), 0, 3)
+            logger.info(f"Stepik search for {data.get('goal')!r}: found {len(courses)} courses")
             if courses:
                 lines = ["\n*Курсы на Stepik по этому этапу:*\n"]
                 for c in courses:
                     lines.append(f"• [{c['title']}]({c['url']})")
-                stepik_block = "\n".join(lines)
-                combined = text + stepik_block
-                if len(combined) <= 4000:
-                    text = combined
-        except Exception:
-            pass
+                text = text + "\n".join(lines)
+        except Exception as e:
+            logger.warning(f"Stepik search failed: {e}")
 
     # Удаляем предыдущее сообщение этапа если он был изменён
     if stage.get("modified"):
