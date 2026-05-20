@@ -754,7 +754,7 @@ async def back_from_hours(callback: CallbackQuery, state: FSMContext):
         pass
     data = await state.get_data()
     if data.get("goal_scope") == "узкий":
-        await callback.message.answer("Чему хочешь научиться?")
+        await callback.message.answer("Что хочешь освоить? Можешь написать любую цель 👇")
         await state.set_state(Form.goal)
     else:
         await callback.message.answer(
@@ -796,7 +796,7 @@ async def back_from_motivation(callback: CallbackQuery, state: FSMContext):
         )
         await state.set_state(Form.specialization)
     else:
-        await callback.message.answer("Чему хочешь научиться?")
+        await callback.message.answer("Что хочешь освоить? Можешь написать любую цель 👇")
         await state.set_state(Form.goal)
 
 
@@ -1151,7 +1151,7 @@ async def build_track(callback: CallbackQuery, state: FSMContext):
     except Exception:
         pass
 
-    loading_msg = await callback.message.answer("Строю персональный трек — это займёт около минуты...")
+    loading_msg = await callback.message.answer("Составляю твой трек, немного подожди ⏳")
 
     stop = asyncio.Event()
     typing_task = asyncio.create_task(_typing_loop(callback.message.chat.id, stop))
@@ -1453,13 +1453,13 @@ async def stage_hard(callback: CallbackQuery, state: FSMContext):
     stage = stages[idx]
 
     await callback.answer("Адаптирую под твой уровень...")
-    msg = await callback.message.answer("Делаю этот этап проще...")
+    msg = await callback.message.answer("Упрощаю, секунду...")
 
     prompt = simplify_prompt(data["goal"], data["level"], stage["title"], stage["topics"], data.get("format_pref", ""))
     try:
         result = await asyncio.to_thread(call_llm, prompt)
     except Exception:
-        await msg.edit_text("❌ Не удалось адаптировать. Попробуй ещё раз.")
+        await msg.edit_text("Что-то пошло не так, попробуй снова 🔄")
         return
     await callback.message.edit_reply_markup(reply_markup=None)
     topics, materials = _split_llm_response(result.strip())
@@ -1484,13 +1484,13 @@ async def stage_easy(callback: CallbackQuery, state: FSMContext):
     stage = stages[idx]
 
     await callback.answer("Усложняю материал...")
-    msg = await callback.message.answer("Подбираю более продвинутые материалы...")
+    msg = await callback.message.answer("Ищу что-то посложнее...")
 
     prompt = advance_prompt(data["goal"], data["level"], stage["title"], stage["topics"], data.get("format_pref", ""))
     try:
         result = await asyncio.to_thread(call_llm, prompt)
     except Exception:
-        await msg.edit_text("❌ Не удалось усложнить. Попробуй ещё раз.")
+        await msg.edit_text("Что-то пошло не так, попробуй снова 🔄")
         return
     await callback.message.edit_reply_markup(reply_markup=None)
     topics, materials = _split_llm_response(result.strip())
@@ -1515,13 +1515,13 @@ async def stage_bad(callback: CallbackQuery, state: FSMContext):
     stage = stages[idx]
 
     await callback.answer("Подбираю альтернативные материалы...")
-    msg = await callback.message.answer("Ищу другие материалы...")
+    msg = await callback.message.answer("Подбираю альтернативу...")
 
     prompt = alternative_prompt(data["goal"], data["level"], stage["title"], stage["topics"], data.get("format_pref", ""))
     try:
         result = await asyncio.to_thread(call_llm, prompt)
     except Exception:
-        await msg.edit_text("❌ Не удалось подобрать альтернативу. Попробуй ещё раз.")
+        await msg.edit_text("Что-то пошло не так, попробуй снова 🔄")
         return
     await callback.message.edit_reply_markup(reply_markup=None)
     stages[idx]["materials"] = result.strip()
