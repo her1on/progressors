@@ -127,6 +127,31 @@ async def _validate_goal(goal: str) -> tuple[str, str, str]:
     return "ok", "", "широкий"
 
 
+async def _assess_timeframe(goal: str, hours: int, months: int) -> tuple[str, str]:
+    """Оценивает адекватность временного плана. Возвращает (verdict, explanation).
+    verdict: АДЕКВАТНО | МАЛО | МНОГО"""
+    total = hours * months * 4
+    prompt = (
+        f"Оцени адекватность временного плана для учебной цели.\n"
+        f"Ответь строго: первая строка — одно слово (АДЕКВАТНО, МАЛО или МНОГО), "
+        f"вторая строка — одно предложение объяснения.\n\n"
+        f"Цель: {goal}\n"
+        f"Часов в неделю: {hours}\n"
+        f"Срок: {months} мес\n"
+        f"Итого часов: {total}"
+    )
+    try:
+        raw = await asyncio.to_thread(call_llm, prompt)
+        lines = [l.strip() for l in raw.strip().splitlines() if l.strip()]
+        verdict = lines[0].upper() if lines else "АДЕКВАТНО"
+        explanation = lines[1] if len(lines) > 1 else ""
+        if verdict not in ("АДЕКВАТНО", "МАЛО", "МНОГО"):
+            return "АДЕКВАТНО", ""
+        return verdict, explanation
+    except Exception:
+        return "АДЕКВАТНО", ""
+
+
 async def _extract_search_terms(goal: str) -> str:
     """Извлекает 2-3 ключевых слова из цели для поиска курсов на Stepik."""
     prompt = (
@@ -736,18 +761,17 @@ async def got_months(callback: CallbackQuery, state: FSMContext):
         pass
 
     hours = data["hours"]
-    weeks = months * 4
-    if data.get("goal_scope") == "узкий" and months >= 6:
+    stop = asyncio.Event()
+    typing_task = asyncio.create_task(_typing_loop(callback.message.chat.id, stop))
+    try:
+        verdict, explanation = await _assess_timeframe(data["goal"], hours, months)
+    finally:
+        stop.set()
+        typing_task.cancel()
+
+    if verdict != "АДЕКВАТНО":
         await callback.message.answer(
-            f"⚠️ Для узкой цели обычно достаточно *1–3 месяца*.\n\n"
-            f"Ты выбрал {months} мес. — продолжить или изменить?",
-            reply_markup=kb_time_warning(),
-        )
-        return
-    if data.get("goal_scope") != "узкий" and hours * weeks < 20:
-        await callback.message.answer(
-            f"⚠️ *{hours} ч/нед × {months} мес = {hours * weeks} ч* — это немного для твоей цели.\n\n"
-            f"Рекомендуем минимум 20 ч суммарно для ощутимого прогресса. Продолжить или пересмотреть?",
+            f"⚠️ {explanation}\n\nПродолжить с *{hours} ч/нед × {months} мес*?",
             reply_markup=kb_time_warning(),
         )
         return
