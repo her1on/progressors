@@ -1255,6 +1255,29 @@ a { color: inherit; text-decoration: none; }
 }
 @keyframes toast-in { from { opacity: 0; transform: translate(-50%, 10px); } to { opacity: 1; transform: translate(-50%, 0); } }
 
+/* ─── confetti ──────────────────────────────────────────────────────────── */
+.confetti-container {
+  position: fixed; inset: 0; pointer-events: none; z-index: 9999; overflow: hidden;
+}
+.confetti-piece {
+  position: absolute; top: -10px; width: 8px; height: 14px; border-radius: 2px;
+  animation: confetti-fall linear forwards;
+}
+@keyframes confetti-fall {
+  0%   { transform: translateY(0) rotate(0deg); opacity: 1; }
+  80%  { opacity: 1; }
+  100% { transform: translateY(110vh) rotate(720deg); opacity: 0; }
+}
+/* planet complete-pulse */
+.planet-done-flash {
+  animation: planet-flash 0.5s ease-out !important;
+}
+@keyframes planet-flash {
+  0%   { transform: scale(1); filter: brightness(1); }
+  50%  { transform: scale(1.35); filter: brightness(2); }
+  100% { transform: scale(1); filter: brightness(1); }
+}
+
 /* density */
 [data-density="compact"] .qcard, [data-density="compact"] .stage-detail-head, [data-density="compact"] .section-card, [data-density="compact"] .task-card { padding: 18px 22px; }
 [data-density="compact"] .qcard-text { font-size: 19px; }
@@ -2210,7 +2233,7 @@ function Constellation({ stages, activeId, completedIds, onPick }) {
                 onClick={() => onPick(s.id)}
                 style={{ paddingLeft: X_OFFSETS[i % X_OFFSETS.length] }}
               >
-                <div className="planet-shell" data-state={planetState} data-planet={s.planet}>
+                <div className="planet-shell" data-state={planetState} data-planet={s.planet} data-planet-id={s.id}>
                   {s.planet === "star" && <span className="corona" />}
                   <span className="halo" />
                   <div className="planet" data-planet={s.planet}>
@@ -2433,7 +2456,14 @@ function TrackScreen({ state, setState, onRestart }) {
       setToast("Отметка снята.");
     } else {
       next = [...completed, id];
-      setToast(`✓ Этап «${activeStage.title}» отмечен как пройденный.`);
+      setToast(`✓ Этап «${activeStage.title}» пройден!`);
+      launchConfetti();
+      // flash planet
+      const planetEl = document.querySelector(`[data-planet-id="${id}"]`);
+      if (planetEl) {
+        planetEl.classList.add("planet-done-flash");
+        setTimeout(() => planetEl.classList.remove("planet-done-flash"), 600);
+      }
       // auto-unlock next
       const idx = STAGES.findIndex((s) => s.id === id);
       const nx = STAGES[idx + 1];
@@ -2556,6 +2586,28 @@ function transformBotStages(botStages, completed, currentStage) {
       final: idx === (botStages.length - 1),
     };
   });
+}
+
+function launchConfetti() {
+  const COLORS = ["#5cc7ff","#8b6dff","#f5c067","#6df0a8","#ff8a6e","#fff"];
+  const container = document.createElement("div");
+  container.className = "confetti-container";
+  document.body.appendChild(container);
+  for (let i = 0; i < 60; i++) {
+    const el = document.createElement("div");
+    el.className = "confetti-piece";
+    el.style.cssText = [
+      `left:${Math.random()*100}%`,
+      `background:${COLORS[Math.floor(Math.random()*COLORS.length)]}`,
+      `animation-duration:${0.9 + Math.random()*1.2}s`,
+      `animation-delay:${Math.random()*0.4}s`,
+      `width:${6+Math.random()*6}px`,
+      `height:${10+Math.random()*8}px`,
+      `border-radius:${Math.random()>0.5?"50%":"2px"}`,
+    ].join(";");
+    container.appendChild(el);
+  }
+  setTimeout(() => container.remove(), 2200);
 }
 
 function App() {
