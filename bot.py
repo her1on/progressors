@@ -1049,7 +1049,6 @@ async def stage_hard(callback: CallbackQuery, state: FSMContext):
     stages = data.get("stages", [])
     stage = stages[idx]
 
-    await callback.message.edit_reply_markup(reply_markup=None)
     await callback.answer("Адаптирую под твой уровень...")
     msg = await callback.message.answer("Делаю этот этап проще...")
 
@@ -1057,8 +1056,9 @@ async def stage_hard(callback: CallbackQuery, state: FSMContext):
     try:
         result = await asyncio.to_thread(call_llm, prompt)
     except Exception:
-        await msg.edit_text("❌ Не удалось адаптировать. Попробуй перейти к следующему этапу.")
+        await msg.edit_text("❌ Не удалось адаптировать. Попробуй ещё раз.")
         return
+    await callback.message.edit_reply_markup(reply_markup=None)
     topics, materials = _split_llm_response(result.strip())
     stages[idx]["topics"] = topics
     stages[idx]["materials"] = materials
@@ -1079,7 +1079,6 @@ async def stage_easy(callback: CallbackQuery, state: FSMContext):
     stages = data.get("stages", [])
     stage = stages[idx]
 
-    await callback.message.edit_reply_markup(reply_markup=None)
     await callback.answer("Усложняю материал...")
     msg = await callback.message.answer("Подбираю более продвинутые материалы...")
 
@@ -1087,8 +1086,9 @@ async def stage_easy(callback: CallbackQuery, state: FSMContext):
     try:
         result = await asyncio.to_thread(call_llm, prompt)
     except Exception:
-        await msg.edit_text("❌ Не удалось усложнить. Попробуй перейти к следующему этапу.")
+        await msg.edit_text("❌ Не удалось усложнить. Попробуй ещё раз.")
         return
+    await callback.message.edit_reply_markup(reply_markup=None)
     topics, materials = _split_llm_response(result.strip())
     stages[idx]["topics"] = topics
     stages[idx]["materials"] = materials
@@ -1109,7 +1109,6 @@ async def stage_bad(callback: CallbackQuery, state: FSMContext):
     stages = data.get("stages", [])
     stage = stages[idx]
 
-    await callback.message.edit_reply_markup(reply_markup=None)
     await callback.answer("Подбираю альтернативные материалы...")
     msg = await callback.message.answer("Ищу другие материалы...")
 
@@ -1117,8 +1116,9 @@ async def stage_bad(callback: CallbackQuery, state: FSMContext):
     try:
         result = await asyncio.to_thread(call_llm, prompt)
     except Exception:
-        await msg.edit_text("❌ Не удалось подобрать альтернативу.")
+        await msg.edit_text("❌ Не удалось подобрать альтернативу. Попробуй ещё раз.")
         return
+    await callback.message.edit_reply_markup(reply_markup=None)
     stages[idx]["materials"] = result.strip()
     stages[idx]["modified"] = "alternative"
     await state.update_data(stages=stages)
