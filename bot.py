@@ -1248,6 +1248,7 @@ async def build_track(callback: CallbackQuery, state: FSMContext):
                 d.get("goal_scope", "широкий"),
                 stages,
                 summary,
+                d.get("skills_text", ""),
             )
         except Exception as e:
             logger.warning(f"Supabase save_track failed: {e}")
