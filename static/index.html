@@ -2129,26 +2129,17 @@ Object.assign(window, {
 const { useEffect, useState, useRef, useMemo } = React;
 
 // ─── Topbar ─────────────────────────────────────────────────────────────
-function Topbar({ step, level, onRestart }) {
+function Topbar({ level }) {
   return (
     <div className="topbar">
-      <div className="brand" onClick={onRestart} style={{ cursor: "pointer" }}>
+      <div className="brand">
         <div className="brand-mark" />
         <div className="brand-name">Прогрессоры</div>
         <div className="brand-tag">ai · навигатор по обучению</div>
       </div>
       <div className="topbar-right">
-        {step === "landing" && <span><span className="dot" /> старт маршрута</span>}
-        {step === "input"   && <span><span className="dot" /> сессия / 01 ввод цели</span>}
-        {step === "quiz"    && <span><span className="dot" /> сессия / 02 диагностика</span>}
-        {step === "reveal"  && <span><span className="dot" /> сессия / 03 уровень определён</span>}
-        {step === "track"   && (
-          <>
-            <span><span className="dot" /> сессия / 04 трек</span>
-            {level && <span className="topbar-level" style={{ color: "var(--acc-3)" }}>уровень · {level}</span>}
-            <button className="btn btn-ghost btn-sm" onClick={onRestart}>Начать заново</button>
-          </>
-        )}
+        <span><span className="dot" /> трек</span>
+        {level && <span className="topbar-level" style={{ color: "var(--acc-3)" }}>уровень · {level}</span>}
       </div>
     </div>
   );
@@ -2159,379 +2150,8 @@ function Cosmos() {
   return <div className="cosmos" aria-hidden="true" />;
 }
 
-// ─── Slider with custom track fill (for hours / months) ────────────────
-function CosmicSlider({ value, min, max, step = 1, onChange, suffix = "", ticks }) {
-  const p = ((value - min) / (max - min)) * 100;
-  return (
-    <div className="slider-wrap">
-      <input
-        type="range"
-        className="slider"
-        min={min} max={max} step={step}
-        value={value}
-        onChange={(e) => onChange(Number(e.target.value))}
-        style={{ "--p": `${p}%` }}
-      />
-      <div className="slider-ticks">
-        {(ticks || [min, Math.round((min + max) / 2), max]).map((t, i) => (
-          <span key={i}>{t}{suffix}</span>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-// ─── Segmented control (budget) ─────────────────────────────────────────
-function Segmented({ options, value, onChange }) {
-  return (
-    <div className="segmented">
-      {options.map((opt) => (
-        <button
-          key={opt.value}
-          type="button"
-          data-active={opt.value === value}
-          onClick={() => onChange(opt.value)}
-        >
-          {opt.label}
-        </button>
-      ))}
-    </div>
-  );
-}
-
-Object.assign(window, { Topbar, Cosmos, CosmicSlider, Segmented });
+Object.assign(window, { Topbar, Cosmos });
 </script>
-  <script type="text/babel">/* global React */
-// ─── Landing screen ─────────────────────────────────────────────────
-function LandingScreen({ onStart }) {
-  return (
-    <div className="landing">
-      <div className="landing-orb" />
-      <div className="eyebrow" style={{ marginBottom: 18 }}>ИИ-навигатор по обучению</div>
-      <h1 className="landing-title">
-        <span className="aurora-text">Прогрессоры</span>
-      </h1>
-      <p className="landing-sub">
-        Скажи, чему хочешь научиться. Мы проведём диагностику, построим персональный трек и подберём реальные курсы — за несколько минут.
-      </p>
-      <div className="landing-features">
-        <div className="landing-feature">
-          <span className="landing-feature-icon">🔭</span>
-          <h3>Диагностика за 4 вопроса</h3>
-          <p>ИИ определит твой текущий уровень — от Новичка до Продвинутого — и учтёт его при составлении трека.</p>
-        </div>
-        <div className="landing-feature">
-          <span className="landing-feature-icon">🪐</span>
-          <h3>Созвездие навыков</h3>
-          <p>Персональный трек из этапов-планет с конкретными темами, результатами и практическими заданиями.</p>
-        </div>
-        <div className="landing-feature">
-          <span className="landing-feature-icon">📡</span>
-          <h3>Реальные курсы</h3>
-          <p>Stepik, Яндекс Практикум, Skillbox — только то, что доступно в России без VPN, в рамках твоего бюджета.</p>
-        </div>
-      </div>
-      <button className="btn btn-primary btn-cta" onClick={onStart}>
-        Начать маршрут →
-      </button>
-    </div>
-  );
-}
-Object.assign(window, { LandingScreen });
-</script>
-  <script type="text/babel">/* global React, CosmicSlider, Segmented */
-const { useState: useStateS, useEffect: useEffectS, useMemo: useMemoS, useRef: useRefS } = React;
-
-const BUDGET_OPTS = [
-  { value: 0,     label: "Бесплатно" },
-  { value: 2500,  label: "2 500 ₽" },
-  { value: 5000,  label: "5 000 ₽" },
-  { value: 10000, label: "10 000 ₽" },
-];
-
-const BUDGET_NOTES = {
-  0:     "Бесплатно: Rutube, бесплатные курсы на Stepik, открытая документация и GitHub. Прогресс возможен, но медленнее.",
-  2500:  "До 2 500 ₽/мес: 1–2 курса на Stepik (500–1 500 ₽), электронные книги, недорогие подписки.",
-  5000:  "До 5 000 ₽/мес: большинство курсов на Stepik, Hexlet, Я.Практикум базовый, 1–2 сессии с ментором.",
-  10000: "До 10 000 ₽/мес: полноценные программы Skillbox, GeekBrains, Я.Практикум, регулярный менторинг.",
-};
-
-// ─── Input screen ──────────────────────────────────────────────────────
-function InputScreen({ state, setState, onSubmit, error, institutionalMsg, onInstitutionalContinue, onInstitutionalBack }) {
-  const { goal, hours, months, budget } = state;
-  const total = hours * months * 4;
-  const fewHours = total < 20;
-
-  return (
-    <div className="input-screen">
-      <div className="intro-side">
-        <div className="intro-eyebrow-row">
-          <span className="eyebrow">Шаг 01 / 04</span>
-          <span className="glyph-divider" />
-          <span className="eyebrow" style={{ color: "var(--acc-1)" }}>координаты маршрута</span>
-        </div>
-        <h1 className="display-1">
-          Куда летим в этот раз,&nbsp;
-          <span className="aurora-text">прогрессор</span>?
-        </h1>
-        <p className="lede" style={{ marginTop: 20 }}>
-          Скажи, чему хочешь научиться. Мы сверим траекторию с твоим уровнем,
-          временем и бюджетом — и построим путь по созвездию навыков.
-        </p>
-        <ul className="intro-bullets">
-          <li>
-            <span className="num">01</span>
-            <span><b>Диагностика за 4 вопроса.</b> ИИ определит твой уровень — от Новичка до Эксперта.</span>
-          </li>
-          <li>
-            <span className="num">02</span>
-            <span><b>Личный трек из этапов-планет.</b> Каждая планета — навык, на котором нужно остановиться.</span>
-          </li>
-          <li>
-            <span className="num">03</span>
-            <span><b>Реальные курсы и задания.</b> Stepik, Я.Практикум, Skillbox — только то, что доступно в РФ без VPN.</span>
-          </li>
-        </ul>
-      </div>
-
-      <form
-        className="panel panel-pad form-card"
-        onSubmit={(e) => { e.preventDefault(); if (goal.trim()) onSubmit(); }}
-      >
-        <div className="field">
-          <label className="field-label">
-            <span>Чему хочешь научиться?</span>
-            <span className="hint">{goal.length}/100</span>
-          </label>
-          <input
-            className="input"
-            placeholder="Например: Python-разработка, ML, веб-дизайн"
-            value={goal}
-            maxLength={100}
-            onChange={(e) => { setState({ ...state, goal: e.target.value }); if (institutionalMsg) onInstitutionalBack(); }}
-          />
-        </div>
-
-        <div className="field">
-          <label className="field-label">
-            <span>Часов в неделю</span>
-            <span className="hint">{hours} ч/нед</span>
-          </label>
-          <CosmicSlider
-            value={hours} min={1} max={40} suffix=" ч"
-            ticks={[1, 10, 20, 30, 40]}
-            onChange={(v) => setState({ ...state, hours: v })}
-          />
-        </div>
-
-        <div className="field">
-          <label className="field-label">
-            <span>За сколько месяцев</span>
-            <span className="hint">{months} мес</span>
-          </label>
-          <CosmicSlider
-            value={months} min={1} max={12} suffix=""
-            ticks={[1, 3, 6, 9, 12]}
-            onChange={(v) => setState({ ...state, months: v })}
-          />
-        </div>
-
-        <div className="field">
-          <label className="field-label">
-            <span>Бюджет в месяц</span>
-            <span className="hint">≈ {total} ч суммарно</span>
-          </label>
-          <Segmented
-            options={BUDGET_OPTS}
-            value={budget}
-            onChange={(v) => setState({ ...state, budget: v })}
-          />
-          <div className="budget-note">{BUDGET_NOTES[budget]}</div>
-        </div>
-
-        {fewHours && (
-          <div className="alert alert-info">
-            <span>💡 Суммарно {total} ч за весь срок — этого может быть мало. Прогресс будет медленным, но реальным.</span>
-          </div>
-        )}
-        {error && (
-          <div className="alert alert-warn">
-            <span>⚠️ {error}</span>
-          </div>
-        )}
-        {institutionalMsg && (
-          <div className="alert alert-warn" style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-            <span>🏛️ <b>Особые требования к профессии</b></span>
-            <span style={{ fontSize: 13 }}>{institutionalMsg}</span>
-            <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-              <button type="button" className="btn btn-primary" style={{ fontSize: 13, padding: "8px 16px" }} onClick={onInstitutionalContinue}>
-                Продолжить всё равно
-              </button>
-              <button type="button" className="btn" style={{ fontSize: 13, padding: "8px 16px", background: "rgba(255,255,255,0.05)", border: "1px solid var(--border-hard)", color: "var(--fg-soft)" }} onClick={onInstitutionalBack}>
-                Скорректировать цель
-              </button>
-            </div>
-          </div>
-        )}
-
-        <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
-          <button type="submit" className="btn btn-primary" disabled={!goal.trim() || !!institutionalMsg}>
-            Запустить диагностику
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-              <path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-          </button>
-          <span style={{ fontFamily: "var(--ff-mono)", fontSize: 11, color: "var(--fg-mute)", letterSpacing: "0.08em" }}>
-            ≈ 2 МИН · 4 ВОПРОСА
-          </span>
-        </div>
-      </form>
-    </div>
-  );
-}
-
-// ─── Quiz screen ───────────────────────────────────────────────────────
-function QuizScreen({ state, setState, onSubmit, onBack }) {
-  const Q = (state.questions && state.questions.length > 0)
-    ? state.questions
-    : window.PROGRESSORS_DATA.QUESTIONS;
-  const OPTS = window.PROGRESSORS_DATA.FIXED_OPTIONS;
-  const answers = state.answers;
-  const answered = answers.filter((a) => a !== null).length;
-  const allDone = answered === Q.length;
-  const footerRef = useRefS(null);
-
-  useEffectS(() => {
-    if (allDone && footerRef.current) {
-      footerRef.current.scrollIntoView({ behavior: "smooth", block: "center" });
-    }
-  }, [allDone]);
-
-  const choose = (qi, oi) => {
-    const next = [...answers];
-    next[qi] = oi;
-    setState({ ...state, answers: next });
-  };
-
-  return (
-    <div className="quiz">
-      <aside className="quiz-aside">
-        <div className="panel panel-pad" style={{ padding: "24px 26px" }}>
-          <div className="eyebrow" style={{ marginBottom: 10 }}>Шаг 02 / 04 · диагностика</div>
-          <div className="display-3" style={{ fontSize: 22, marginBottom: 20 }}>{state.goal}</div>
-          <div className="quiz-progress">
-            <div className="quiz-progress-bar">
-              {Q.map((_, i) => (
-                <i key={i}
-                   data-done={answers[i] !== null && i < answered}
-                   data-current={i === answered && !allDone} />
-              ))}
-            </div>
-            <div className="quiz-meta">
-              <div className="row"><span>Отвечено</span><span>{answered} / {Q.length}</span></div>
-              <div className="row"><span>Часов/нед</span><span>{state.hours} ч</span></div>
-              <div className="row"><span>Срок</span><span>{state.months} мес</span></div>
-              <div className="row"><span>Бюджет</span><span>{state.budget === 0 ? "Бесплатно" : `${state.budget} ₽`}</span></div>
-            </div>
-          </div>
-          <div style={{ marginTop: 24, fontSize: 13, color: "var(--fg-mute)", lineHeight: 1.55 }}>
-            Шкала ответов фиксированная — ИИ-вопросы подобраны под неё. Уровень рассчитывается по формуле, без лишнего вызова модели.
-          </div>
-          <button className="btn btn-ghost btn-sm" style={{ marginTop: 18 }} onClick={onBack}>← Назад</button>
-        </div>
-      </aside>
-
-      <div className="quiz-questions">
-        {Q.map((q, i) => (
-          <div key={i} className="panel qcard">
-            <div className="qcard-num">Вопрос {String(i + 1).padStart(2, "0")} / {Q.length}</div>
-            <h3 className="qcard-text">{q.question || q.q}</h3>
-            <div className="qoptions">
-              {OPTS.map((opt, oi) => (
-                <button
-                  key={opt.key}
-                  type="button"
-                  className="qopt"
-                  data-selected={answers[i] === oi}
-                  onClick={() => choose(i, oi)}
-                >
-                  <span className="qopt-key">{opt.key}</span>
-                  <span>{opt.label}</span>
-                </button>
-              ))}
-            </div>
-          </div>
-        ))}
-
-        <div className="quiz-footer" ref={footerRef}>
-          <span className="progress-text">{answered} / {Q.length} ответов</span>
-          <button className="btn btn-primary" disabled={!allDone} onClick={onSubmit}>
-            Определить уровень
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-              <path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ─── Reveal screen ─────────────────────────────────────────────────────
-function RevealScreen({ state, onContinue }) {
-  const { LEVELS } = window.PROGRESSORS_DATA;
-  const lvl = LEVELS[state.level] || LEVELS["Средний уровень"];
-  const total = state.hours * state.months * 4;
-
-  return (
-    <div className="reveal">
-      <div className="reveal-inner">
-        <div className="reveal-eyebrow eyebrow">Шаг 03 / 04 · диагностика завершена</div>
-
-        <div className="badge-orb">
-          <span className="badge-corona" />
-          <div className="planet" data-planet="star" style={{ position: "absolute", inset: 18 }}>
-            <div className="planet-surface" />
-            <div className="planet-light" />
-          </div>
-          <div className="badge-orb-icon">{lvl.letter}</div>
-        </div>
-
-        <div className="reveal-level">уровень определён</div>
-        <h1 className="display-2 reveal-title">
-          <span className="aurora-text">{lvl.short}</span>
-        </h1>
-        <p className="reveal-desc">{lvl.desc}</p>
-
-        <div className="reveal-stats">
-          <div className="reveal-stat">
-            <div className="k">Цель</div>
-            <div className="v" style={{ fontSize: 16, lineHeight: 1.3 }}>{state.goal}</div>
-          </div>
-          <div className="reveal-stat">
-            <div className="k">Время</div>
-            <div className="v">{total} ч</div>
-          </div>
-          <div className="reveal-stat">
-            <div className="k">Бюджет</div>
-            <div className="v">{state.budget === 0 ? "0 ₽" : `${state.budget} ₽`}</div>
-          </div>
-        </div>
-
-        <button className="btn btn-primary" onClick={onContinue}>
-          Построить трек
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-            <path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
-        </button>
-      </div>
-    </div>
-  );
-}
-
-Object.assign(window, { InputScreen, QuizScreen, RevealScreen });
-</script>
-  <script type="text/babel">/* global React */
 const { useState: useStateT, useMemo: useMemoT, useRef: useRefT, useEffect: useEffectT } = React;
 
 const PLAT_SHORT = {
@@ -3053,9 +2673,9 @@ function TrackScreen({ state, setState, onRestart }) {
 
 Object.assign(window, { TrackScreen });
 </script>
-  <script type="text/babel">/* global React, ReactDOM, Cosmos, Topbar, LandingScreen, InputScreen, QuizScreen, RevealScreen, TrackScreen,
-   TweaksPanel, useTweaks, TweakSection, TweakRadio, TweakColor, TweakToggle, TweakSlider */
-const { useState, useEffect, useMemo } = React;
+  <script type="text/babel">/* global React, ReactDOM, Cosmos, Topbar, TrackScreen,
+   TweaksPanel, useTweaks, TweakSection, TweakRadio, TweakToggle, TweakSlider */
+const { useState, useEffect } = React;
 
 const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
   "accent": "aurora",
@@ -3099,7 +2719,6 @@ function transformBotStages(botStages, completed, currentStage) {
 function App() {
   const [t, setTweak] = useTweaks(TWEAK_DEFAULTS);
 
-  // apply accent palette as CSS variables on root
   useEffect(() => {
     const root = document.documentElement;
     const preset = ACCENT_PRESETS[t.accent] || ACCENT_PRESETS.aurora;
@@ -3109,235 +2728,63 @@ function App() {
     root.dataset.cinematic = t.cinematic ? "true" : "false";
   }, [t]);
 
-  const LS_KEY = "progressors_session";
-  const loadSession = () => {
-    try {
-      const raw = localStorage.getItem(LS_KEY);
-      if (!raw) return null;
-      return JSON.parse(raw);
-    } catch { return null; }
-  };
-  const saved = (() => {
-    const s = loadSession();
-    if (s?.step === "track" && (!s?.state?.stages || s.state.stages.length === 0)) {
-      return { ...s, step: "reveal" };
-    }
-    return s;
-  })();
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [state, setState] = useState({ goal: "", hours: 0, months: 0, level: "", stages: [], courses: {} });
 
-  // step machine — landing only shown on first visit (no saved session)
-  const [step, setStep] = useState(saved?.step || "landing");
-  const [tgInitData, setTgInitData] = useState("");
-
-  // Telegram Mini App: load track from Supabase on mount
   useEffect(() => {
     const tg = window.Telegram?.WebApp;
-    if (!tg?.initData) return;
+    if (!tg || !tg.initData) {
+      setLoading(false);
+      setError("not-telegram");
+      return;
+    }
     tg.ready();
     tg.expand();
-    setTgInitData(tg.initData);
-    setLoading(true);
-    setLoadingMsg("Загружаем твой трек…");
     fetch("/api/webapp/track", { headers: { "X-Init-Data": tg.initData } })
       .then(r => { if (!r.ok) throw new Error(r.status); return r.json(); })
       .then(data => {
         const stages = transformBotStages(data.stages || [], data.completed || [], data.current_stage || 0);
-        setState(prev => ({ ...prev, goal: data.goal || "", level: data.level || "", hours: data.hours || 0, months: data.months || 0, stages, courses: {} }));
-        setStep("track");
+        setState({ goal: data.goal || "", level: data.level || "", hours: data.hours || 0, months: data.months || 0, stages, courses: {} });
         setLoading(false);
       })
       .catch(() => {
         setLoading(false);
-        setError("Трек не найден. Пройди онбординг в боте и нажми «📱 Открыть трек».");
+        setError("no-track");
       });
   }, []);
-  const [loading, setLoading] = useState(false);
-  const [loadingMsg, setLoadingMsg] = useState("");
-  const [error, setError] = useState("");
-  const [institutionalMsg, setInstitutionalMsg] = useState("");
-  const [state, setState] = useState(saved?.state || {
-    goal: "",
-    hours: 10,
-    months: 3,
-    budget: 0,
-    questions: [],
-    answers: [],
-    level: "",
-    stages: [],
-    qaText: "",
-    courses: {},
-  });
 
-  useEffect(() => {
-    if (step === "input" && !state.goal) {
-      localStorage.removeItem(LS_KEY);
-    } else {
-      localStorage.setItem(LS_KEY, JSON.stringify({ step, state }));
-    }
-  }, [step, state]);
-
-  const fetchQuestions = async () => {
-    setInstitutionalMsg("");
-    setError("");
-    setLoading(true);
-    setLoadingMsg("Составляем вопросы диагностики…");
-    try {
-      const qRes = await fetch("/api/questions", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ goal: state.goal }),
-      });
-      if (!qRes.ok) {
-        const err = await qRes.json().catch(() => ({}));
-        throw new Error(err.detail || `Ошибка сервера ${qRes.status}`);
-      }
-      const qData = await qRes.json();
-      setState({ ...state, questions: qData.questions, answers: new Array(qData.questions.length).fill(null) });
-      setStep("quiz");
-      window.scrollTo({ top: 0, behavior: "smooth" });
-    } catch(e) {
-      setError("Ошибка соединения с сервером. Убедись, что сервер запущен.");
-    }
-    setLoading(false);
-  };
-
-  const submitInput = async () => {
-    setLoading(true);
-    setError("");
-    setInstitutionalMsg("");
-    setLoadingMsg("Проверяем цель…");
-    try {
-      const vRes = await fetch("/api/validate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ goal: state.goal }),
-      });
-      const validate = await vRes.json();
-      if (validate.status === "invalid" || validate.status === "abstract" || validate.status === "unrealistic") {
-        setError(validate.message || "Уточни цель.");
-        setLoading(false);
-        return;
-      }
-      if (validate.status === "institutional") {
-        setInstitutionalMsg(validate.message || "Эта профессия требует специального отбора.");
-        setLoading(false);
-        return;
-      }
-      setLoadingMsg("Составляем вопросы диагностики…");
-      const qRes = await fetch("/api/questions", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ goal: state.goal }),
-      });
-      if (!qRes.ok) {
-        const err = await qRes.json().catch(() => ({}));
-        throw new Error(err.detail || `Ошибка сервера ${qRes.status}`);
-      }
-      const qData = await qRes.json();
-      setState({ ...state, questions: qData.questions, answers: new Array(qData.questions.length).fill(null) });
-      setStep("quiz");
-      window.scrollTo({ top: 0, behavior: "smooth" });
-    } catch(e) {
-      setError("Ошибка соединения с сервером. Убедись, что сервер запущен.");
-    }
-    setLoading(false);
-  };
-
-  // calculate level on quiz submit (local, no API)
-  const submitQuiz = () => {
-    const score = state.answers.reduce((acc, x) => acc + (x ?? 0), 0);
-    let level;
-    if (score <= 3) level = "Полный новичок";
-    else if (score <= 6) level = "Базовые знания";
-    else if (score <= 9) level = "Средний уровень";
-    else level = "Продвинутый";
-    const OPTS = [
-      "A) Никогда не пробовал / не слышал",
-      "B) Знаком в теории, но не практиковал",
-      "C) Практиковал, есть реальный опыт",
-      "D) Занимаюсь на продвинутом/профессиональном уровне",
-    ];
-    const qaText = (state.questions || []).map((q, i) =>
-      `Вопрос ${i + 1}: ${q.question || q.q}\nОтвет: ${OPTS[state.answers[i]] || OPTS[0]}`
-    ).join("\n\n");
-    setState({ ...state, level, qaText });
-    setStep("reveal");
-    window.scrollTo({ top: 0, behavior: "smooth" });
-  };
-
-  const goToTrack = async () => {
-    setLoading(true);
-    setLoadingMsg("ИИ строит персональный маршрут. Обычно это занимает 30–60 секунд…");
-    window.scrollTo({ top: 0, behavior: "smooth" });
-    try {
-      const res = await fetch("/api/track", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          goal: state.goal,
-          level: state.level,
-          hours: state.hours,
-          months: state.months,
-          budget: state.budget,
-          qa_text: state.qaText || "",
-        }),
-      });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.detail || `Ошибка сервера ${res.status}`);
-      }
-      const data = await res.json();
-      // Сначала кладём данные, потом переключаем шаг —
-      // так TrackScreen монтируется уже с правильными этапами
-      setState(prev => ({ ...prev, stages: data.stages || [], courses: data.courses || {} }));
-      setStep("track");
-    } catch(e) {
-      setError("Ошибка при генерации трека. Попробуй ещё раз.");
-    }
-    setLoading(false);
-  };
-
-  const reset = () => {
-    setStep("landing");
-    setError("");
-    setState({
-      goal: "",
-      hours: 10,
-      months: 3,
-      budget: 0,
-      questions: [],
-      answers: [],
-      level: "",
-      stages: [],
-      qaText: "",
-      courses: {},
-    });
-    window.scrollTo({ top: 0, behavior: "smooth" });
-  };
-
-  // В Telegram режиме показываем только трек или экран ошибки
-  if (tgInitData && step !== "track") {
+  if (loading) {
     return (
       <>
         <Cosmos />
-        {loading ? (
-          <div style={{ position: "fixed", inset: 0, zIndex: 200, background: "rgba(5,7,15,0.88)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 20, backdropFilter: "blur(10px)" }}>
-            <div className="brand-mark" style={{ width: 56, height: 56, animation: "spin 2s linear infinite" }} />
-            <div style={{ fontFamily: "var(--ff-mono)", fontSize: 13, color: "var(--fg-soft)", letterSpacing: "0.1em", textAlign: "center", maxWidth: 340, lineHeight: 1.6 }}>
-              Загружаем твой трек…
-            </div>
+        <div style={{ position: "fixed", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 20 }}>
+          <div className="brand-mark" style={{ width: 56, height: 56, animation: "spin 2s linear infinite" }} />
+          <div style={{ fontFamily: "var(--ff-mono)", fontSize: 13, color: "var(--fg-soft)", letterSpacing: "0.1em" }}>
+            Загружаем твой трек…
           </div>
-        ) : (
-          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "100vh", padding: "32px 24px", textAlign: "center", gap: 20 }}>
-            <div style={{ fontSize: 48 }}>🪐</div>
-            <div style={{ fontSize: 20, fontWeight: 700, color: "var(--fg)" }}>Трек не найден</div>
-            <div style={{ fontSize: 15, color: "var(--fg-soft)", lineHeight: 1.6, maxWidth: 300 }}>
-              Пройди онбординг в боте и нажми кнопку<br/>
-              <strong>«📱 Открыть трек»</strong><br/>
-              после генерации маршрута.
-            </div>
+        </div>
+      </>
+    );
+  }
+
+  if (error) {
+    const isNotTelegram = error === "not-telegram";
+    return (
+      <>
+        <Cosmos />
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "100vh", padding: "32px 24px", textAlign: "center", gap: 20 }}>
+          <div style={{ fontSize: 48 }}>🪐</div>
+          <div style={{ fontSize: 20, fontWeight: 700, color: "var(--fg)" }}>
+            {isNotTelegram ? "Открой через бота" : "Трек не найден"}
           </div>
-        )}
+          <div style={{ fontSize: 15, color: "var(--fg-soft)", lineHeight: 1.6, maxWidth: 300 }}>
+            {isNotTelegram
+              ? "Этот сайт работает только как Telegram Mini App. Открой его через кнопку в боте."
+              : <>Пройди онбординг в боте и нажми кнопку<br/><strong>«📱 Открыть трек»</strong><br/>после генерации маршрута.</>
+            }
+          </div>
+        </div>
       </>
     );
   }
@@ -3345,123 +2792,10 @@ function App() {
   return (
     <>
       <Cosmos />
-
-      {loading && (
-        <div style={{
-          position: "fixed", inset: 0, zIndex: 200,
-          background: "rgba(5,7,15,0.88)",
-          display: "flex", flexDirection: "column",
-          alignItems: "center", justifyContent: "center",
-          gap: 20, backdropFilter: "blur(10px)",
-        }}>
-          <div className="brand-mark" style={{ width: 56, height: 56, animation: "spin 2s linear infinite" }} />
-          <div style={{ fontFamily: "var(--ff-mono)", fontSize: 13, color: "var(--fg-soft)", letterSpacing: "0.1em", textAlign: "center", maxWidth: 340, lineHeight: 1.6 }}>
-            {loadingMsg}
-          </div>
-        </div>
-      )}
-
-      <div className="app" data-screen-label={
-        step === "landing" ? "00 Старт" :
-        step === "input"   ? "01 Ввод цели" :
-        step === "quiz"    ? "02 Диагностика" :
-        step === "reveal"  ? "03 Уровень" :
-                             "04 Трек"
-      }>
-        <Topbar step={step} level={state.level} onRestart={reset} />
-
-        {step === "landing" && (
-          <LandingScreen onStart={() => { setStep("input"); window.scrollTo({ top: 0, behavior: "smooth" }); }} />
-        )}
-        {step === "input" && (
-          <InputScreen
-            state={state}
-            setState={setState}
-            error={error}
-            onSubmit={submitInput}
-            institutionalMsg={institutionalMsg}
-            onInstitutionalContinue={fetchQuestions}
-            onInstitutionalBack={() => setInstitutionalMsg("")}
-          />
-        )}
-        {step === "quiz" && (
-          <QuizScreen
-            state={state}
-            setState={setState}
-            onSubmit={submitQuiz}
-            onBack={() => setStep("input")}
-          />
-        )}
-        {step === "reveal" && (
-          <RevealScreen
-            state={state}
-            onContinue={goToTrack}
-          />
-        )}
-        {step === "track" && (
-          <TrackScreen state={state} setState={setState} onRestart={reset} />
-        )}
+      <div className="app" data-screen-label="04 Трек">
+        <Topbar level={state.level} />
+        <TrackScreen state={state} setState={setState} onRestart={() => {}} />
       </div>
-
-      <TweaksPanel title="Tweaks">
-        <TweakSection title="Палитра">
-          <TweakRadio
-            label="Акцент"
-            value={t.accent}
-            onChange={(v) => setTweak("accent", v)}
-            options={[
-              { value: "aurora",    label: "Аврора" },
-              { value: "nebula",    label: "Туманность" },
-              { value: "supernova", label: "Сверхновая" },
-              { value: "ion",       label: "Ионный" },
-            ]}
-          />
-        </TweakSection>
-
-        <TweakSection title="Картинка">
-          <TweakSlider
-            label="Звёзды"
-            value={t.starsIntensity}
-            min={0} max={100} step={5}
-            onChange={(v) => setTweak("starsIntensity", v)}
-          />
-          <TweakToggle
-            label="Кинорежим (доп. свечение)"
-            value={t.cinematic}
-            onChange={(v) => setTweak("cinematic", v)}
-          />
-          <TweakRadio
-            label="Плотность"
-            value={t.density}
-            onChange={(v) => setTweak("density", v)}
-            options={[
-              { value: "comfortable", label: "Комфорт" },
-              { value: "compact",     label: "Компакт" },
-            ]}
-          />
-        </TweakSection>
-
-        <TweakSection title="Демо-навигация">
-          <div style={{ display: "grid", gap: 8 }}>
-            {[
-              ["landing", "00 · Лендинг"],
-              ["input",   "01 · Ввод цели"],
-              ["quiz",    "02 · Диагностика"],
-              ["reveal",  "03 · Уровень"],
-              ["track",   "04 · Трек"],
-            ].map(([k, label]) => (
-              <button
-                key={k}
-                className="btn btn-ghost btn-sm"
-                style={{ justifyContent: "flex-start" }}
-                onClick={() => { setStep(k); if (k === "reveal" && !state.level) setState({ ...state, level: "Средний уровень" }); window.scrollTo({ top: 0, behavior: "smooth" }); }}
-              >
-                {step === k ? "● " : "○ "}{label}
-              </button>
-            ))}
-          </div>
-        </TweakSection>
-      </TweaksPanel>
     </>
   );
 }
