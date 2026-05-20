@@ -21,6 +21,7 @@ from aiogram.types import (
     LinkPreviewOptions,
     Message,
     ReplyKeyboardMarkup,
+    WebAppInfo,
 )
 from dotenv import load_dotenv
 
@@ -39,6 +40,7 @@ from llm_client import call_llm
 from level import parse_questions
 from stepik import search_stepik_courses
 from youtube import search_youtube_video
+from supabase_client import save_track as _sb_save_track, update_progress as _sb_update_progress
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -294,6 +296,9 @@ def kb_build():
     ]])
 
 
+WEBAPP_URL = os.getenv("WEBAPP_URL", "https://progressors-production.up.railway.app")
+
+
 def kb_stage(idx: int, is_last: bool):
     rows = [
         [InlineKeyboardButton(text="✅ Пройдено", callback_data=f"done_{idx}")],
@@ -302,6 +307,7 @@ def kb_stage(idx: int, is_last: bool):
             InlineKeyboardButton(text="😊 Просто", callback_data=f"easy_{idx}"),
         ],
         [InlineKeyboardButton(text="👎 Не подошло", callback_data=f"bad_{idx}")],
+        [InlineKeyboardButton(text="📱 Открыть трек", web_app=WebAppInfo(url=WEBAPP_URL))],
     ]
     nav = []
     if idx > 0:
@@ -1206,6 +1212,24 @@ async def build_track(callback: CallbackQuery, state: FSMContext):
 
     await state.update_data(stages=stages, summary=summary, current_stage=0, completed=[], search_terms=search_terms)
     await state.set_state(Form.track)
+
+    async def _save_to_supabase():
+        try:
+            d = await state.get_data()
+            await asyncio.to_thread(
+                _sb_save_track,
+                callback.from_user.id,
+                d.get("goal", ""),
+                d.get("level", ""),
+                d.get("hours", 0),
+                d.get("months", 0),
+                d.get("goal_scope", "широкий"),
+                stages,
+                summary,
+            )
+        except Exception as e:
+            logger.warning(f"Supabase save_track failed: {e}")
+    asyncio.create_task(_save_to_supabase())
     if summary:
         final_data = await state.get_data()
         summary_label = (
@@ -1362,6 +1386,9 @@ async def stage_done(callback: CallbackQuery, state: FSMContext):
     if idx not in completed:
         completed.append(idx)
     await state.update_data(completed=completed, current_stage=idx + 1)
+    asyncio.create_task(asyncio.to_thread(
+        _sb_update_progress, callback.from_user.id, completed, idx + 1
+    ))
     await callback.message.edit_reply_markup(reply_markup=None)
     await callback.answer("✅ Отмечено как пройденное!")
     next_idx = idx + 1
