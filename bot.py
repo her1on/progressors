@@ -499,9 +499,9 @@ def _limit_source_lines(text: str, source: str, max_count: int) -> str:
 
 def format_stage(stage: dict, idx: int, total: int) -> str:
     badge = {
-        "simplified": "[ Этап упрощён под твой уровень ]\n\n",
-        "advanced":   "[ Этап усложнён под твой уровень ]\n\n",
-        "alternative": "[ Альтернативные материалы ]\n\n",
+        "simplified": "_Этап упрощён под твой уровень_\n\n",
+        "advanced":   "_Этап усложнён под твой уровень_\n\n",
+        "alternative": "_Альтернативные материалы_\n\n",
     }.get(stage.get("modified", ""), "")
     text = (
         f"{badge}"
@@ -509,7 +509,8 @@ def format_stage(stage: dict, idx: int, total: int) -> str:
         f"{stage['weeks']} нед\n\n"
     )
     if stage.get("topics"):
-        text += f"*Что изучать:*\n{stage['topics']}\n\n"
+        safe_topics = stage['topics'].replace('[', '(').replace(']', ')')
+        text += f"*Что изучать:*\n{safe_topics}\n\n"
     if stage.get("materials"):
         materials = _remove_stepik_lines(stage["materials"])
         materials = _limit_source_lines(materials, "YouTube", 2)
