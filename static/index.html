@@ -2707,17 +2707,27 @@ function App() {
     }
     tg.ready();
     tg.expand();
-    fetch("/api/webapp/track", { headers: { "X-Init-Data": tg.initData } })
-      .then(r => { if (!r.ok) throw new Error(r.status); return r.json(); })
-      .then(data => {
-        const stages = transformBotStages(data.stages || [], data.completed || [], data.current_stage || 0);
-        setState({ goal: data.goal || "", level: data.level || "", hours: data.hours || 0, months: data.months || 0, skills_text: data.skills_text || "", stages, courses: {} });
-        setLoading(false);
-      })
-      .catch(() => {
-        setLoading(false);
-        setError("no-track");
-      });
+
+    const loadTrack = (silent = false) => {
+      fetch("/api/webapp/track", { headers: { "X-Init-Data": tg.initData } })
+        .then(r => { if (!r.ok) throw new Error(r.status); return r.json(); })
+        .then(data => {
+          const stages = transformBotStages(data.stages || [], data.completed || [], data.current_stage || 0);
+          setState({ goal: data.goal || "", level: data.level || "", hours: data.hours || 0, months: data.months || 0, skills_text: data.skills_text || "", stages, courses: {} });
+          if (!silent) setLoading(false);
+        })
+        .catch(() => {
+          if (!silent) { setLoading(false); setError("no-track"); }
+        });
+    };
+
+    loadTrack();
+
+    const onVisible = () => { if (document.visibilityState === "visible") loadTrack(true); };
+    document.addEventListener("visibilitychange", onVisible);
+    tg.onEvent?.("activated", () => loadTrack(true));
+
+    return () => document.removeEventListener("visibilitychange", onVisible);
   }, []);
 
   if (loading) {
