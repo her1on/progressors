@@ -120,6 +120,8 @@ async def _validate_goal(goal: str) -> tuple[str, str, str]:
         scope = "узкий" if "узкий" in scope else "широкий"
         return "ok", "", scope
     explanation = lines[1].strip() if len(lines) > 1 else ""
+    if "ЗАПРЕЩЕНО" in first:
+        return "forbidden", explanation or "Эта тема не поддерживается.", "широкий"
     if "НЕРЕАЛИСТИЧНО" in first:
         return "unrealistic", explanation or "Цель физически невозможна.", "широкий"
     if "АБСТРАКТНО" in first:
@@ -663,6 +665,10 @@ async def got_goal(message: Message, state: FSMContext):
     finally:
         stop.set()
         typing_task.cancel()
+
+    if status == "forbidden":
+        await message.answer(f"🚫 {explanation}\n\nПопробуй другую цель.")
+        return
 
     if status == "unrealistic":
         await message.answer(f"❌ {explanation}\n\nПопробуй сформулировать цель иначе.")
