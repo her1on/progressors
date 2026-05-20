@@ -305,10 +305,9 @@ def kb_stage(idx: int, is_last: bool):
     rows = [
         [InlineKeyboardButton(text="✅ Пройдено", callback_data=f"done_{idx}")],
         [
-            InlineKeyboardButton(text="😕 Сложно", callback_data=f"hard_{idx}"),
-            InlineKeyboardButton(text="😊 Просто", callback_data=f"easy_{idx}"),
+            InlineKeyboardButton(text="❤️", callback_data=f"like_{idx}"),
+            InlineKeyboardButton(text="👎", callback_data=f"dislike_{idx}"),
         ],
-        [InlineKeyboardButton(text="👎 Не подошло", callback_data=f"bad_{idx}")],
         [InlineKeyboardButton(text="📱 Открыть трек", web_app=WebAppInfo(url=WEBAPP_URL))],
     ]
     nav = []
@@ -319,6 +318,14 @@ def kb_stage(idx: int, is_last: bool):
     if nav:
         rows.append(nav)
     return InlineKeyboardMarkup(inline_keyboard=rows)
+
+
+def kb_dislike(idx: int):
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="😕 Слишком сложно", callback_data=f"hard_{idx}")],
+        [InlineKeyboardButton(text="😊 Слишком просто", callback_data=f"easy_{idx}")],
+        [InlineKeyboardButton(text="↩️ Отмена", callback_data=f"cancel_feedback_{idx}")],
+    ])
 
 
 def kb_restart():
@@ -565,9 +572,8 @@ async def cmd_help(message: Message):
         "/help — эта справка\n\n"
         "*На каждом этапе трека можно:*\n"
         "✅ Отметить как пройденное\n"
-        "😕 Слишком сложно — упростить материал\n"
-        "😊 Слишком просто — усложнить материал\n"
-        "👎 Не подошло — получить альтернативные ресурсы\n"
+        "❤️ Сохранить этап как понравившийся\n"
+        "👎 Дать обратную связь — упростить или усложнить материал\n"
         "➡️ Пропустить и перейти дальше",
         reply_markup=kb_menu(),
     )
@@ -1445,6 +1451,34 @@ async def stage_prev(callback: CallbackQuery, state: FSMContext):
     await state.update_data(current_stage=prev_idx)
     await callback.answer()
     await _send_stage(callback.message, state, prev_idx, edit=True)
+
+
+@dp.callback_query(Form.track, F.data.startswith("like_"))
+async def stage_like(callback: CallbackQuery, state: FSMContext):
+    idx = int(callback.data.split("_")[1])
+    data = await state.get_data()
+    stages = data.get("stages", [])
+    stages[idx]["liked"] = True
+    await state.update_data(stages=stages)
+    asyncio.create_task(asyncio.to_thread(_sb_update_stages, callback.from_user.id, stages))
+    await callback.answer("❤️ Этап сохранён как понравившийся!")
+
+
+@dp.callback_query(Form.track, F.data.startswith("dislike_"))
+async def stage_dislike(callback: CallbackQuery, state: FSMContext):
+    idx = int(callback.data.split("_")[1])
+    await callback.answer()
+    await callback.message.edit_reply_markup(reply_markup=kb_dislike(idx))
+
+
+@dp.callback_query(Form.track, F.data.startswith("cancel_feedback_"))
+async def cancel_feedback(callback: CallbackQuery, state: FSMContext):
+    idx = int(callback.data.split("_")[2])
+    data = await state.get_data()
+    stages = data.get("stages", [])
+    is_last = idx == len(stages) - 1
+    await callback.answer()
+    await callback.message.edit_reply_markup(reply_markup=kb_stage(idx, is_last))
 
 
 @dp.callback_query(Form.track, F.data.startswith("hard_"))
