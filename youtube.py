@@ -25,6 +25,7 @@ def search_youtube_video(query: str, exclude_ids: set[str] | None = None) -> tup
             "type": "video",
             "maxResults": 5,
             "relevanceLanguage": "ru",
+            "order": "viewCount",
         }, timeout=10)
         resp.raise_for_status()
         items = resp.json().get("items", [])
