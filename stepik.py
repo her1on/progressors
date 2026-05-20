@@ -48,9 +48,7 @@ def search_stepik_courses(query: str, budget: int, limit: int = 5, difficulty: s
     # не должен находить "Двойные диаграммы состояния" вместо курсов по интегралам.
     key_words = [w.lower() for w in (filter_terms or query).split() if len(w) > 4]
     if key_words:
-        relevant = [c for c in filtered if any(kw in c["title"].lower() for kw in key_words)]
-        if relevant:
-            filtered = relevant
+        filtered = [c for c in filtered if any(kw in c["title"].lower() for kw in key_words)]
 
     if difficulty and any(c["difficulty"] == difficulty for c in filtered):
         filtered = [c for c in filtered if c["difficulty"] == difficulty]
