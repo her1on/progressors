@@ -127,13 +127,20 @@ async def _validate_goal(goal: str) -> tuple[str, str, str]:
 
 
 async def _fetch_track(prompt: str) -> tuple[list[dict], str]:
-    track_text = await asyncio.to_thread(call_llm, prompt, "gpt-5.5")
-    logger.info(f"Track raw response (first 300): {track_text[:300]}")
-    stages, summary = parse_track(track_text)
-    if not stages:
-        logger.error(f"parse_track returned empty. Full response:\n{track_text}")
-        raise ValueError("no stages")
-    return stages, summary
+    last_exc: Exception | None = None
+    for model in ("gpt-5.5", "gpt-5.4"):
+        try:
+            track_text = await asyncio.to_thread(call_llm, prompt, model)
+            logger.info(f"Track raw response [{model}] (first 300): {track_text[:300]}")
+            stages, summary = parse_track(track_text)
+            if not stages:
+                logger.error(f"parse_track empty [{model}]. Full response:\n{track_text}")
+                raise ValueError("no stages")
+            return stages, summary
+        except Exception as e:
+            logger.warning(f"_fetch_track failed with {model}: {e}")
+            last_exc = e
+    raise last_exc
 
 
 # ── FSM States ────────────────────────────────────────────────────────────────
