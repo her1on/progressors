@@ -302,15 +302,20 @@ def kb_build():
 WEBAPP_URL = os.getenv("WEBAPP_URL", "https://progressors-production.up.railway.app")
 
 
-def kb_stage(idx: int, is_last: bool):
+def kb_stage(idx: int, is_last: bool, feedback: str | None = None):
     rows = [
         [InlineKeyboardButton(text="✅ Пройдено", callback_data=f"done_{idx}")],
-        [
+    ]
+    if feedback is None:
+        rows.append([
             InlineKeyboardButton(text="❤️", callback_data=f"like_{idx}"),
             InlineKeyboardButton(text="👎", callback_data=f"dislike_{idx}"),
-        ],
-        [InlineKeyboardButton(text="📱 Открыть трек", web_app=WebAppInfo(url=WEBAPP_URL))],
-    ]
+        ])
+    elif feedback == "liked":
+        rows.append([InlineKeyboardButton(text="❤️ Понравилось", callback_data="noop")])
+    else:
+        rows.append([InlineKeyboardButton(text="👎 Оценено", callback_data="noop")])
+    rows.append([InlineKeyboardButton(text="📱 Открыть трек", web_app=WebAppInfo(url=WEBAPP_URL))])
     nav = []
     if idx > 0:
         nav.append(InlineKeyboardButton(text="⬅️ Назад", callback_data=f"prev_{idx}"))
@@ -505,6 +510,14 @@ def _limit_source_lines(text: str, source: str, max_count: int) -> str:
                 continue
         result.append(line)
     return "\n".join(result).strip()
+
+
+def _stage_feedback(stage: dict) -> str | None:
+    if stage.get("liked"):
+        return "liked"
+    if stage.get("modified") or stage.get("disliked"):
+        return "disliked"
+    return None
 
 
 def format_stage(stage: dict, idx: int, total: int) -> str:
@@ -1360,21 +1373,22 @@ async def _send_stage(message: Message, state: FSMContext, idx: int, edit: bool 
             except Exception:
                 pass
 
+    feedback = _stage_feedback(stage)
     no_preview = LinkPreviewOptions(is_disabled=True)
     if edit:
         try:
-            sent = await message.edit_text(text[:4000], reply_markup=kb_stage(idx, is_last), link_preview_options=no_preview)
+            sent = await message.edit_text(text[:4000], reply_markup=kb_stage(idx, is_last, feedback), link_preview_options=no_preview)
         except Exception:
-            sent = await message.answer(text[:4000], reply_markup=kb_stage(idx, is_last), link_preview_options=no_preview)
+            sent = await message.answer(text[:4000], reply_markup=kb_stage(idx, is_last, feedback), link_preview_options=no_preview)
     else:
         try:
-            sent = await message.answer(text[:4000], reply_markup=kb_stage(idx, is_last), link_preview_options=no_preview)
+            sent = await message.answer(text[:4000], reply_markup=kb_stage(idx, is_last, feedback), link_preview_options=no_preview)
         except Exception as e:
             logger.warning(f"Markdown send failed for stage {idx}, retrying as plain text: {e}")
             sent = await message.answer(
                 re.sub(r"[*_`\[\]]", "", text[:4000]),
                 parse_mode=None,
-                reply_markup=kb_stage(idx, is_last),
+                reply_markup=kb_stage(idx, is_last, feedback),
                 link_preview_options=no_preview,
             )
 
@@ -1467,20 +1481,35 @@ async def stage_prev(callback: CallbackQuery, state: FSMContext):
     await _send_stage(callback.message, state, prev_idx, edit=True)
 
 
+@dp.callback_query(F.data == "noop")
+async def noop_handler(callback: CallbackQuery):
+    await callback.answer("Ты уже оценил этот этап")
+
+
 @dp.callback_query(Form.track, F.data.startswith("like_"))
 async def stage_like(callback: CallbackQuery, state: FSMContext):
     idx = int(callback.data.split("_")[1])
     data = await state.get_data()
     stages = data.get("stages", [])
+    if stages[idx].get("liked") or stages[idx].get("disliked") or stages[idx].get("modified"):
+        await callback.answer("Ты уже оценил этот этап")
+        return
     stages[idx]["liked"] = True
     await state.update_data(stages=stages)
     asyncio.create_task(asyncio.to_thread(_sb_update_stages, callback.from_user.id, stages))
+    is_last = idx == len(stages) - 1
+    await callback.message.edit_reply_markup(reply_markup=kb_stage(idx, is_last, "liked"))
     await callback.answer("❤️ Этап сохранён как понравившийся!")
 
 
 @dp.callback_query(Form.track, F.data.startswith("dislike_"))
 async def stage_dislike(callback: CallbackQuery, state: FSMContext):
     idx = int(callback.data.split("_")[1])
+    data = await state.get_data()
+    stages = data.get("stages", [])
+    if stages[idx].get("liked") or stages[idx].get("disliked") or stages[idx].get("modified"):
+        await callback.answer("Ты уже оценил этот этап")
+        return
     await callback.answer()
     await callback.message.edit_reply_markup(reply_markup=kb_dislike(idx))
 
@@ -1516,6 +1545,7 @@ async def stage_hard(callback: CallbackQuery, state: FSMContext):
     stages[idx]["topics"] = topics
     stages[idx]["materials"] = materials
     stages[idx]["modified"] = "simplified"
+    stages[idx]["disliked"] = True
     await state.update_data(stages=stages)
     asyncio.create_task(asyncio.to_thread(_sb_update_stages, callback.from_user.id, stages))
     await msg.delete()
@@ -1547,6 +1577,7 @@ async def stage_easy(callback: CallbackQuery, state: FSMContext):
     stages[idx]["topics"] = topics
     stages[idx]["materials"] = materials
     stages[idx]["modified"] = "advanced"
+    stages[idx]["disliked"] = True
     await state.update_data(stages=stages)
     asyncio.create_task(asyncio.to_thread(_sb_update_stages, callback.from_user.id, stages))
     await msg.delete()
