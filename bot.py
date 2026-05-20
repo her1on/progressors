@@ -1361,6 +1361,8 @@ async def _send_stage(message: Message, state: FSMContext, idx: int, edit: bool 
             for c in courses:
                 lines.append(f"• [{c['title']}]({c['url']})")
             text = text + "\n".join(lines)
+        else:
+            text += "\n\n🔍 *Степик:* курсы по этой теме не найдены"
 
     # Удаляем предыдущее сообщение этапа если он был изменён
     if stage.get("modified"):

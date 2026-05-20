@@ -143,6 +143,8 @@ async def _stepik_links_for_stage(stage: dict, goal: str = "") -> list[dict]:
         ]
     except Exception:
         links = []
+    if not links:
+        links = [{"source": "Stepik", "title": "Курсы не найдены", "url": "", "thumb": None}]
     if r:
         await r.setex(rkey, 3600, json.dumps(links))
     else:
