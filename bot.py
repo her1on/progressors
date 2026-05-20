@@ -1112,13 +1112,57 @@ async def _send_stage(message: Message, state: FSMContext, idx: int, edit: bool 
 async def stage_done(callback: CallbackQuery, state: FSMContext):
     idx = int(callback.data.split("_")[1])
     data = await state.get_data()
+    stages = data.get("stages", [])
     completed = data.get("completed", [])
+
+    is_last = idx == len(stages) - 1
+    if is_last:
+        skipped = [i for i in range(idx) if i not in completed]
+        if skipped:
+            await callback.answer()
+            await callback.message.answer(
+                f"⚠️ Ты пропустил {len(skipped)} этап(а). Хочешь завершить маршрут?",
+                reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+                    [InlineKeyboardButton(text="✅ Всё равно завершить", callback_data=f"finish_anyway_{idx}")],
+                    [InlineKeyboardButton(text="↩️ Вернуться к пропущенным", callback_data=f"goto_{skipped[0]}")],
+                ]),
+            )
+            return
+
     if idx not in completed:
         completed.append(idx)
     await state.update_data(completed=completed, current_stage=idx + 1)
     await callback.message.edit_reply_markup(reply_markup=None)
     await callback.answer("✅ Отмечено как пройденное!")
     await _send_stage(callback.message, state, idx + 1)
+
+
+@dp.callback_query(Form.track, F.data.startswith("finish_anyway_"))
+async def finish_anyway(callback: CallbackQuery, state: FSMContext):
+    idx = int(callback.data.split("_")[2])
+    data = await state.get_data()
+    completed = data.get("completed", [])
+    if idx not in completed:
+        completed.append(idx)
+    await state.update_data(completed=completed, current_stage=idx + 1)
+    try:
+        await callback.message.edit_reply_markup(reply_markup=None)
+    except Exception:
+        pass
+    await callback.answer("✅ Маршрут завершён!")
+    await _send_stage(callback.message, state, idx + 1)
+
+
+@dp.callback_query(Form.track, F.data.startswith("goto_"))
+async def goto_stage(callback: CallbackQuery, state: FSMContext):
+    idx = int(callback.data.split("_")[1])
+    await state.update_data(current_stage=idx)
+    try:
+        await callback.message.edit_reply_markup(reply_markup=None)
+    except Exception:
+        pass
+    await callback.answer()
+    await _send_stage(callback.message, state, idx)
 
 
 @dp.callback_query(Form.track, F.data.startswith("next_"))
