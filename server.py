@@ -101,20 +101,21 @@ async def _parse_materials_with_links(materials: str) -> list[dict]:
 
 
 async def _stepik_links_for_stage(stage: dict, goal: str = "") -> list[dict]:
-    query = goal or stage.get("title", "")
+    query = stage.get("title", "") or goal
     if not query:
         return []
-    if query in _stepik_cache:
-        return _stepik_cache[query]
+    cache_key = f"{query}|{goal}"
+    if cache_key in _stepik_cache:
+        return _stepik_cache[cache_key]
     try:
-        courses = await asyncio.to_thread(search_stepik_courses, query, 0, 2)
+        courses = await asyncio.to_thread(search_stepik_courses, query, 0, 2, None, goal or None)
         links = [
             {"source": "Stepik", "title": c["title"], "url": c["url"], "thumb": None}
             for c in courses
         ]
     except Exception:
         links = []
-    _stepik_cache[query] = links
+    _stepik_cache[cache_key] = links
     return links
 
 
