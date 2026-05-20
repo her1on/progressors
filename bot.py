@@ -99,7 +99,8 @@ async def _fetch_questions(goal: str) -> list[dict]:
 async def _fetch_specializations(goal: str) -> list[str]:
     try:
         raw = await asyncio.to_thread(call_llm, specialize_prompt(goal))
-        data = json.loads(raw.strip())
+        raw = re.sub(r"```[a-zA-Z]*\n?", "", raw).replace("```", "").strip()
+        data = json.loads(raw)
         return [item["option"] for item in data if "option" in item][:3]
     except Exception as e:
         logger.warning(f"_fetch_specializations failed for goal={goal!r}: {e}")
