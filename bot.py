@@ -152,6 +152,22 @@ async def _assess_timeframe(goal: str, hours: int, months: int) -> tuple[str, st
         return "АДЕКВАТНО", ""
 
 
+async def _recommend_schedule(goal: str) -> tuple[int, int]:
+    """Возвращает (hours, months) — рекомендованный план на основе цели."""
+    prompt = (
+        f"Порекомендуй оптимальное количество часов в неделю и срок обучения для цели.\n"
+        f"Ответь строго в формате (только два числа):\nЧАСЫ: X\nМЕСЯЦЫ: X\n\nЦель: {goal}"
+    )
+    try:
+        raw = await asyncio.to_thread(call_llm, prompt)
+        lines = raw.strip().splitlines()
+        hours = int(re.search(r"\d+", lines[0]).group())
+        months = int(re.search(r"\d+", lines[1]).group())
+        return max(1, min(hours, 40)), max(1, min(months, 24))
+    except Exception:
+        return 10, 3
+
+
 async def _extract_search_terms(goal: str) -> str:
     """Извлекает 2-3 ключевых слова из цели для поиска курсов на Stepik."""
     prompt = (
@@ -209,21 +225,32 @@ def kb_menu():
 
 
 def kb_hours():
-    return InlineKeyboardMarkup(inline_keyboard=[[
-        InlineKeyboardButton(text="2 ч/нед", callback_data="h_2"),
-        InlineKeyboardButton(text="5 ч/нед", callback_data="h_5"),
-        InlineKeyboardButton(text="10 ч/нед", callback_data="h_10"),
-        InlineKeyboardButton(text="20+ ч/нед", callback_data="h_20"),
-    ]])
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [
+            InlineKeyboardButton(text="2 ч/нед", callback_data="h_2"),
+            InlineKeyboardButton(text="5 ч/нед", callback_data="h_5"),
+            InlineKeyboardButton(text="10 ч/нед", callback_data="h_10"),
+            InlineKeyboardButton(text="20+ ч/нед", callback_data="h_20"),
+        ],
+        [
+            InlineKeyboardButton(text="✏️ Ввести своё", callback_data="h_custom"),
+            InlineKeyboardButton(text="Рекомендуемый план", callback_data="h_recommend"),
+        ],
+    ])
 
 
 def kb_months():
-    return InlineKeyboardMarkup(inline_keyboard=[[
-        InlineKeyboardButton(text="1 мес", callback_data="m_1"),
-        InlineKeyboardButton(text="3 мес", callback_data="m_3"),
-        InlineKeyboardButton(text="6 мес", callback_data="m_6"),
-        InlineKeyboardButton(text="12 мес", callback_data="m_12"),
-    ]])
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [
+            InlineKeyboardButton(text="1 мес", callback_data="m_1"),
+            InlineKeyboardButton(text="3 мес", callback_data="m_3"),
+            InlineKeyboardButton(text="6 мес", callback_data="m_6"),
+            InlineKeyboardButton(text="12 мес", callback_data="m_12"),
+        ],
+        [
+            InlineKeyboardButton(text="✏️ Ввести своё", callback_data="m_custom"),
+        ],
+    ])
 
 
 
@@ -696,6 +723,96 @@ async def got_hours(callback: CallbackQuery, state: FSMContext):
     await state.set_state(Form.months)
 
 
+@dp.callback_query(Form.hours, F.data == "h_custom")
+async def hours_custom(callback: CallbackQuery, state: FSMContext):
+    await callback.answer()
+    try:
+        await callback.message.delete()
+    except Exception:
+        pass
+    await callback.message.answer("Введи количество часов в неделю (например: 7):")
+
+
+@dp.message(Form.hours)
+async def got_hours_text(message: Message, state: FSMContext):
+    try:
+        hours = int(message.text.strip())
+        if hours <= 0 or hours > 168:
+            raise ValueError
+    except ValueError:
+        await message.answer("Введи число от 1 до 168:")
+        return
+    await state.update_data(hours=hours)
+    await message.answer(
+        f"*{hours} ч/нед* — принято. За сколько месяцев хочешь достичь цели?",
+        reply_markup=kb_months(),
+    )
+    await state.set_state(Form.months)
+
+
+@dp.callback_query(Form.hours, F.data == "h_recommend")
+async def hours_recommend(callback: CallbackQuery, state: FSMContext):
+    await callback.answer()
+    try:
+        await callback.message.delete()
+    except Exception:
+        pass
+    data = await state.get_data()
+    stop = asyncio.Event()
+    typing_task = asyncio.create_task(_typing_loop(callback.message.chat.id, stop))
+    try:
+        hours, months = await _recommend_schedule(data["goal"])
+    finally:
+        stop.set()
+        typing_task.cancel()
+    await state.update_data(hours=hours, months=months)
+    data = await state.get_data()
+    await callback.message.answer(
+        f"*Рекомендуемый план:* {hours} ч/нед · {months} мес\n\n"
+        f"_На основе твоей цели и типичного темпа обучения._",
+        reply_markup=kb_build() if data.get("goal_scope") == "широкий" else None,
+    )
+    await _proceed_after_months(callback.message, callback.from_user.id, state, data)
+
+
+@dp.callback_query(Form.months, F.data == "m_custom")
+async def months_custom(callback: CallbackQuery, state: FSMContext):
+    await callback.answer()
+    try:
+        await callback.message.delete()
+    except Exception:
+        pass
+    await callback.message.answer("Введи количество месяцев (например: 4):")
+
+
+@dp.message(Form.months)
+async def got_months_text(message: Message, state: FSMContext):
+    try:
+        months = int(message.text.strip())
+        if months <= 0 or months > 24:
+            raise ValueError
+    except ValueError:
+        await message.answer("Введи число от 1 до 24:")
+        return
+    await state.update_data(months=months)
+    data = await state.get_data()
+    hours = data["hours"]
+    stop = asyncio.Event()
+    typing_task = asyncio.create_task(_typing_loop(message.chat.id, stop))
+    try:
+        verdict, explanation = await _assess_timeframe(data["goal"], hours, months)
+    finally:
+        stop.set()
+        typing_task.cancel()
+    if verdict != "АДЕКВАТНО":
+        await message.answer(
+            f"⚠️ {explanation}\n\nПродолжить с *{hours} ч/нед × {months} мес*?",
+            reply_markup=kb_time_warning(),
+        )
+        return
+    await _proceed_after_months(message, message.from_user.id, state, data)
+
+
 MOTIVATION_LABELS = {
     "mot_career":   "Новая профессия",
     "mot_work":     "Текущая работа",
@@ -710,10 +827,9 @@ FORMAT_LABELS = {
 }
 
 
-async def _proceed_after_months(callback: CallbackQuery, state: FSMContext, data: dict) -> None:
+async def _proceed_after_months(message: Message, user_id: int, state: FSMContext, data: dict) -> None:
     if data.get("goal_scope") == "узкий":
         await state.update_data(motivation="Личное обучение", format_pref="Любой формат")
-        user_id = callback.from_user.id
         task = _questions_tasks.pop(user_id, None)
         if task:
             task.cancel()
@@ -735,14 +851,14 @@ async def _proceed_after_months(callback: CallbackQuery, state: FSMContext, data
         track_task = asyncio.create_task(_fetch_track(prompt))
         _track_tasks[user_id] = track_task
         _search_term_tasks[user_id] = asyncio.create_task(_extract_search_terms(data["goal"]))
-        await callback.message.answer(
+        await message.answer(
             f"*Цель:* {escape_md(data['goal'])}\n"
             f"*Время:* {data['hours']} ч/нед · {data['months']} мес",
             reply_markup=kb_build(),
         )
         await state.set_state(Form.track)
     else:
-        await callback.message.answer(
+        await message.answer(
             "*Что движет тобой?* Это поможет подобрать материалы точнее.",
             reply_markup=kb_motivation(),
         )
@@ -776,7 +892,7 @@ async def got_months(callback: CallbackQuery, state: FSMContext):
         )
         return
 
-    await _proceed_after_months(callback, state, data)
+    await _proceed_after_months(callback.message, callback.from_user.id, state, data)
 
 
 @dp.callback_query(F.data == "time_ok")
@@ -788,7 +904,7 @@ async def time_warning_ok(callback: CallbackQuery, state: FSMContext):
     except Exception:
         pass
     await state.set_state(Form.months)
-    await _proceed_after_months(callback, state, data)
+    await _proceed_after_months(callback.message, callback.from_user.id, state, data)
 
 
 @dp.callback_query(F.data == "time_change")
