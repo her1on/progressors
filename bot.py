@@ -183,7 +183,9 @@ async def _extract_search_terms(goal: str) -> str:
         raw = await asyncio.to_thread(call_llm, prompt)
         return raw.strip().splitlines()[0].strip()
     except Exception:
-        return goal.split("—")[0].strip()
+        _STOP = {"стать", "научиться", "хочу", "как", "освоить", "изучить", "понять", "узнать", "начать", "учиться", "получить"}
+        words = [w for w in goal.split("—")[0].split() if w.lower() not in _STOP]
+        return " ".join(words) if words else goal.split("—")[0].strip()
 
 
 async def _fetch_track(prompt: str) -> tuple[list[dict], str]:
