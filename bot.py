@@ -82,9 +82,9 @@ async def _typing_loop(chat_id: int, stop: asyncio.Event) -> None:
         await asyncio.sleep(4)
 
 
-async def _fetch_questions(goal: str) -> list[dict]:
+async def _fetch_questions(goal: str, skills_text: str = "") -> list[dict]:
     try:
-        raw = await asyncio.to_thread(call_llm, questions_prompt(goal))
+        raw = await asyncio.to_thread(call_llm, questions_prompt(goal, skills_text))
         questions = parse_questions(raw)
         if questions:
             return questions
@@ -214,6 +214,7 @@ class Form(StatesGroup):
     months = State()
     motivation = State()
     format_pref = State()
+    skills = State()
     quiz = State()
     track = State()
 
@@ -690,16 +691,12 @@ async def got_goal(message: Message, state: FSMContext):
             return
 
     if scope == "узкий":
-        questions_task = asyncio.create_task(_fetch_questions(goal))
-        _questions_tasks[message.from_user.id] = questions_task
         await message.answer(
             f"Отлично! Цель: *{escape_md(goal)}*\n\nСколько часов в неделю готов уделять учёбе?",
             reply_markup=kb_hours(),
         )
         await state.set_state(Form.hours)
     else:
-        questions_task = asyncio.create_task(_fetch_questions(goal))
-        _questions_tasks[message.from_user.id] = questions_task
         await message.answer(
             f"Отлично! Цель: *{escape_md(goal)}*\n\n*Что движет тобой?* Это поможет подобрать материалы точнее.",
             reply_markup=kb_motivation(),
@@ -724,9 +721,6 @@ async def got_specialization(callback: CallbackQuery, state: FSMContext):
         if idx < len(options):
             goal = f"{goal} — {options[idx]}"
             await state.update_data(goal=goal)
-
-    questions_task = asyncio.create_task(_fetch_questions(goal))
-    _questions_tasks[callback.from_user.id] = questions_task
 
     await callback.message.answer(
         f"Цель: *{escape_md(goal)}*\n\n*Что движет тобой?* Это поможет подобрать материалы точнее.",
@@ -953,6 +947,7 @@ async def _proceed_after_months(message: Message, user_id: int, state: FSMContex
             motivation=data.get("motivation", "Личное обучение"),
             format_pref=data.get("format_pref", "Любой формат"),
             scope=data.get("goal_scope", "широкий"),
+            skills_text=data.get("skills_text", ""),
         )
         track_task = asyncio.create_task(_fetch_track(prompt))
         _track_tasks[user_id] = track_task
@@ -964,10 +959,11 @@ async def _proceed_after_months(message: Message, user_id: int, state: FSMContex
                 f"*Время:* {data['hours']} ч/нед · {data['months']} мес"
             )
         else:
-            profile_text = (
+            skills_line = f"\n*Навыки:* {escape_md(data['skills_text'])}" if data.get("skills_text") else ""
+        profile_text = (
                 f"*Твой профиль*\n\n"
                 f"*Цель:* {escape_md(data['goal'])}\n"
-                f"*Уровень:* {level}\n\n"
+                f"*Уровень:* {level}{skills_line}\n\n"
                 f"*Мотивация:* {data.get('motivation', '')}\n"
                 f"*Формат:* {data.get('format_pref', '')}\n"
                 f"*Время:* {data['hours']} ч/нед · {data['months']} мес"
@@ -1054,29 +1050,6 @@ async def got_motivation(callback: CallbackQuery, state: FSMContext):
     await state.set_state(Form.format_pref)
 
 
-async def _resolve_questions_and_start_quiz(callback: CallbackQuery, state: FSMContext):
-    """Получает вопросы квиза (из фонового таска или свежим запросом) и запускает квиз."""
-    data = await state.get_data()
-    user_id = callback.from_user.id
-    task = _questions_tasks.pop(user_id, None)
-
-    if task and task.done() and not task.exception():
-        questions = task.result()
-    else:
-        if task:
-            task.cancel()
-        stop = asyncio.Event()
-        typing_task = asyncio.create_task(_typing_loop(callback.message.chat.id, stop))
-        try:
-            questions = await _fetch_questions(data["goal"])
-        finally:
-            stop.set()
-            typing_task.cancel()
-
-    await state.update_data(questions=questions, current_q=0, answers=[])
-    await _send_question(callback.message, state)
-    await state.set_state(Form.quiz)
-
 
 @dp.callback_query(Form.format_pref, F.data.startswith("fmt_"))
 async def got_format(callback: CallbackQuery, state: FSMContext):
@@ -1087,7 +1060,46 @@ async def got_format(callback: CallbackQuery, state: FSMContext):
         await callback.message.delete()
     except Exception:
         pass
-    await _resolve_questions_and_start_quiz(callback, state)
+    await callback.message.answer(
+        "*Какими навыками по этой теме ты уже обладаешь?*\n"
+        "_Напиши свободно — это поможет не повторять то, что ты уже знаешь, и точнее настроить квиз._",
+        reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="Пропустить", callback_data="skip_skills")],
+        ]),
+    )
+    await state.set_state(Form.skills)
+
+
+@dp.message(Form.skills)
+async def got_skills(message: Message, state: FSMContext):
+    skills_text = message.text.strip()
+    await state.update_data(skills_text=skills_text)
+    await _start_quiz_with_skills(message, state, skills_text)
+
+
+@dp.callback_query(Form.skills, F.data == "skip_skills")
+async def skip_skills(callback: CallbackQuery, state: FSMContext):
+    await callback.answer()
+    try:
+        await callback.message.delete()
+    except Exception:
+        pass
+    await state.update_data(skills_text="")
+    await _start_quiz_with_skills(callback.message, state, "")
+
+
+async def _start_quiz_with_skills(message: Message, state: FSMContext, skills_text: str):
+    data = await state.get_data()
+    stop = asyncio.Event()
+    typing_task = asyncio.create_task(_typing_loop(message.chat.id, stop))
+    try:
+        questions = await _fetch_questions(data["goal"], skills_text)
+    finally:
+        stop.set()
+        typing_task.cancel()
+    await state.update_data(questions=questions, current_q=0, answers=[])
+    await _send_question(message, state)
+    await state.set_state(Form.quiz)
 
 
 async def _send_question(message: Message, state: FSMContext):
@@ -1180,6 +1192,7 @@ async def build_track(callback: CallbackQuery, state: FSMContext):
                     motivation=data.get("motivation", ""),
                     format_pref=data.get("format_pref", ""),
                     scope=data.get("goal_scope", "широкий"),
+                    skills_text=data.get("skills_text", ""),
                 )
                 task = asyncio.create_task(_fetch_track(prompt))
             stages, summary = await task
