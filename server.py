@@ -17,8 +17,10 @@ load_dotenv()
 
 from supabase_client import get_track, update_progress as supabase_update_progress, update_stages as supabase_update_stages
 from youtube import search_youtube_video
+from stepik import search_stepik_courses
 
-_yt_cache: dict[str, str] = {}
+_yt_cache: dict[str, tuple[str, str]] = {}
+_stepik_cache: dict[str, list[dict]] = {}
 
 BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
 
@@ -62,19 +64,24 @@ _SEARCH_URLS = {
 
 async def _parse_materials_with_links(materials: str) -> list[dict]:
     result = []
+    yt_count = 0
     for line in materials.split("\n"):
         m = re.match(r"\[([^\]\n]+)\]\s+([^\n]+)", line.strip())
         if not m:
             continue
         source = m.group(1).strip()
+        if source.lower() == "stepik":
+            continue  # added separately via Stepik API
         rest = m.group(2).strip()
         title = rest.split(" — ")[0].strip()
         base = _SEARCH_URLS.get(source.lower())
         if not base or not title:
             continue
-        url = base.format(urllib.parse.quote_plus(title))
-        thumb = None
         if source.lower() == "youtube":
+            if yt_count >= 2:
+                continue
+            url = base.format(urllib.parse.quote_plus(title))
+            thumb = None
             if title in _yt_cache:
                 url, vid_id = _yt_cache[title]
                 thumb = f"https://img.youtube.com/vi/{vid_id}/mqdefault.jpg"
@@ -87,8 +94,27 @@ async def _parse_materials_with_links(materials: str) -> list[dict]:
                         thumb = f"https://img.youtube.com/vi/{vid_id}/mqdefault.jpg"
                 except Exception:
                     pass
-        result.append({"source": source, "title": title, "url": url, "thumb": thumb})
+            yt_count += 1
+            result.append({"source": source, "title": title, "url": url, "thumb": thumb})
     return result
+
+
+async def _stepik_links_for_stage(stage: dict) -> list[dict]:
+    title = stage.get("title", "")
+    if not title:
+        return []
+    if title in _stepik_cache:
+        return _stepik_cache[title]
+    try:
+        courses = await asyncio.to_thread(search_stepik_courses, title, 0, 2)
+        links = [
+            {"source": "Stepik", "title": c["title"], "url": c["url"], "thumb": None}
+            for c in courses
+        ]
+    except Exception:
+        links = []
+    _stepik_cache[title] = links
+    return links
 
 
 @app.get("/api/webapp/track")
@@ -98,10 +124,14 @@ async def webapp_get_track(x_init_data: str = Header(...)):
     if not track:
         raise HTTPException(404, "Трек не найден. Пройди онбординг в боте.")
     stages = track.get("stages") or []
-    tasks = [_parse_materials_with_links(s.get("materials", "")) for s in stages]
-    links_per_stage = await asyncio.gather(*tasks)
-    for s, links in zip(stages, links_per_stage):
-        s["materials_links"] = links
+    yt_tasks = [_parse_materials_with_links(s.get("materials", "")) for s in stages]
+    st_tasks = [_stepik_links_for_stage(s) for s in stages]
+    yt_results, st_results = await asyncio.gather(
+        asyncio.gather(*yt_tasks),
+        asyncio.gather(*st_tasks),
+    )
+    for s, yt_links, st_links in zip(stages, yt_results, st_results):
+        s["materials_links"] = yt_links + st_links
     return track
 
 
