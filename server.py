@@ -99,21 +99,21 @@ async def _parse_materials_with_links(materials: str) -> list[dict]:
     return result
 
 
-async def _stepik_links_for_stage(stage: dict) -> list[dict]:
-    title = stage.get("title", "")
-    if not title:
+async def _stepik_links_for_stage(stage: dict, goal: str = "") -> list[dict]:
+    query = goal or stage.get("title", "")
+    if not query:
         return []
-    if title in _stepik_cache:
-        return _stepik_cache[title]
+    if query in _stepik_cache:
+        return _stepik_cache[query]
     try:
-        courses = await asyncio.to_thread(search_stepik_courses, title, 0, 2)
+        courses = await asyncio.to_thread(search_stepik_courses, query, 0, 2)
         links = [
             {"source": "Stepik", "title": c["title"], "url": c["url"], "thumb": None}
             for c in courses
         ]
     except Exception:
         links = []
-    _stepik_cache[title] = links
+    _stepik_cache[query] = links
     return links
 
 
@@ -124,8 +124,9 @@ async def webapp_get_track(x_init_data: str = Header(...)):
     if not track:
         raise HTTPException(404, "Трек не найден. Пройди онбординг в боте.")
     stages = track.get("stages") or []
+    goal = track.get("goal", "")
     yt_tasks = [_parse_materials_with_links(s.get("materials", "")) for s in stages]
-    st_tasks = [_stepik_links_for_stage(s) for s in stages]
+    st_tasks = [_stepik_links_for_stage(s, goal) for s in stages]
     yt_results, st_results = await asyncio.gather(
         asyncio.gather(*yt_tasks),
         asyncio.gather(*st_tasks),
