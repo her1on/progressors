@@ -4,7 +4,7 @@ import requests
 _DIFFICULTY_RANK = {"easy": 0, "medium": 1, "hard": 2}
 
 
-def search_stepik_courses(query: str, budget: int, limit: int = 5, difficulty: str | None = None) -> list[dict[str, str | int]]:
+def search_stepik_courses(query: str, budget: int, limit: int = 5, difficulty: str | None = None, filter_terms: str | None = None) -> list[dict[str, str | int]]:
     url = "https://stepik.org/api/courses"
     params = {
         "search": query,
@@ -43,10 +43,10 @@ def search_stepik_courses(query: str, budget: int, limit: int = 5, difficulty: s
             "difficulty": (course.get("difficulty") or "").lower(),
         })
 
-    # relevance filter: keep only courses where title contains at least one
-    # meaningful query word (>4 chars). Prevents "испанский язык" from returning
-    # Turkish/Chinese courses that match only on the generic word "язык".
-    key_words = [w.lower() for w in query.split() if len(w) > 4]
+    # relevance filter: use filter_terms (full original query) when provided,
+    # otherwise fall back to query. This prevents shortened queries like "двойные"
+    # from matching "Двойные диаграммы состояния" when searching for "двойные интегралы".
+    key_words = [w.lower() for w in (filter_terms or query).split() if len(w) > 4]
     if key_words:
         relevant = [c for c in filtered if any(kw in c["title"].lower() for kw in key_words)]
         if relevant:

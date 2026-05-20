@@ -1351,7 +1351,7 @@ async def _send_stage(message: Message, state: FSMContext, idx: int, edit: bool 
         courses = []
         for query in queries:
             try:
-                found = await asyncio.to_thread(search_stepik_courses, query, 0, 3, stage_difficulty)
+                found = await asyncio.to_thread(search_stepik_courses, query, 0, 3, stage_difficulty, terms)
                 logger.info(f"Stepik search for {query!r} (difficulty={stage_difficulty}): found {len(found)} courses")
                 if found:
                     courses = found
