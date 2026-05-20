@@ -852,9 +852,8 @@ async def hours_recommend(callback: CallbackQuery, state: FSMContext):
     await state.update_data(hours=hours, months=months)
     data = await state.get_data()
     await callback.message.answer(
-        f"*Рекомендуемый план:* {hours} ч/нед · {months} мес\n\n"
+        f"*Рекомендуемый план:* {hours} ч/нед · {months} мес\n"
         f"_На основе твоей цели и типичного темпа обучения._",
-        reply_markup=kb_build() if data.get("goal_scope") == "широкий" else None,
     )
     await _proceed_after_months(callback.message, callback.from_user.id, state, data)
 
