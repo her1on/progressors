@@ -152,11 +152,13 @@ async def _assess_timeframe(goal: str, hours: int, months: int) -> tuple[str, st
         return "АДЕКВАТНО", ""
 
 
-async def _recommend_schedule(goal: str) -> tuple[int, int]:
-    """Возвращает (hours, months) — рекомендованный план на основе цели."""
+async def _recommend_schedule(goal: str, level: str = "") -> tuple[int, int]:
+    """Возвращает (hours, months) — рекомендованный план на основе цели и уровня."""
+    level_line = f"Уровень пользователя: {level}\n" if level else ""
     prompt = (
         f"Порекомендуй оптимальное количество часов в неделю и срок обучения для цели.\n"
-        f"Ответь строго в формате (только два числа):\nЧАСЫ: X\nМЕСЯЦЫ: X\n\nЦель: {goal}"
+        f"Ответь строго в формате (только два числа):\nЧАСЫ: X\nМЕСЯЦЫ: X\n\n"
+        f"Цель: {goal}\n{level_line}"
     )
     try:
         raw = await asyncio.to_thread(call_llm, prompt)
@@ -668,15 +670,22 @@ async def got_goal(message: Message, state: FSMContext):
             await state.set_state(Form.specialization)
             return
 
-    # Узкая цель или не удалось получить специализации — сразу к часам
-    questions_task = asyncio.create_task(_fetch_questions(goal))
-    _questions_tasks[message.from_user.id] = questions_task
-
-    await message.answer(
-        f"Отлично! Цель: *{escape_md(goal)}*\n\nСколько часов в неделю готов уделять учёбе?",
-        reply_markup=kb_hours(),
-    )
-    await state.set_state(Form.hours)
+    if scope == "узкий":
+        questions_task = asyncio.create_task(_fetch_questions(goal))
+        _questions_tasks[message.from_user.id] = questions_task
+        await message.answer(
+            f"Отлично! Цель: *{escape_md(goal)}*\n\nСколько часов в неделю готов уделять учёбе?",
+            reply_markup=kb_hours(),
+        )
+        await state.set_state(Form.hours)
+    else:
+        questions_task = asyncio.create_task(_fetch_questions(goal))
+        _questions_tasks[message.from_user.id] = questions_task
+        await message.answer(
+            f"Отлично! Цель: *{escape_md(goal)}*\n\n*Что движет тобой?* Это поможет подобрать материалы точнее.",
+            reply_markup=kb_motivation(),
+        )
+        await state.set_state(Form.motivation)
 
 
 @dp.callback_query(Form.specialization, F.data.startswith("spec_"))
@@ -701,10 +710,10 @@ async def got_specialization(callback: CallbackQuery, state: FSMContext):
     _questions_tasks[callback.from_user.id] = questions_task
 
     await callback.message.answer(
-        f"Цель: *{escape_md(goal)}*\n\nСколько часов в неделю готов уделять учёбе?",
-        reply_markup=kb_hours(),
+        f"Цель: *{escape_md(goal)}*\n\n*Что движет тобой?* Это поможет подобрать материалы точнее.",
+        reply_markup=kb_motivation(),
     )
-    await state.set_state(Form.hours)
+    await state.set_state(Form.motivation)
 
 
 @dp.callback_query(Form.hours, F.data.startswith("h_"))
@@ -761,7 +770,7 @@ async def hours_recommend(callback: CallbackQuery, state: FSMContext):
     stop = asyncio.Event()
     typing_task = asyncio.create_task(_typing_loop(callback.message.chat.id, stop))
     try:
-        hours, months = await _recommend_schedule(data["goal"])
+        hours, months = await _recommend_schedule(data["goal"], level=data.get("level", ""))
     finally:
         stop.set()
         typing_task.cancel()
@@ -828,14 +837,22 @@ FORMAT_LABELS = {
 
 
 async def _proceed_after_months(message: Message, user_id: int, state: FSMContext, data: dict) -> None:
-    if data.get("goal_scope") == "узкий":
-        await state.update_data(motivation="Личное обучение", format_pref="Любой формат")
-        task = _questions_tasks.pop(user_id, None)
-        if task:
-            task.cancel()
-        level = "Полный новичок"
-        qa_text = ""
-        await state.update_data(level=level, qa_text=qa_text)
+    build_track_now = data.get("goal_scope") == "узкий" or data.get("quiz_done")
+
+    if build_track_now:
+        if data.get("goal_scope") == "узкий":
+            await state.update_data(motivation="Личное обучение", format_pref="Любой формат")
+            task = _questions_tasks.pop(user_id, None)
+            if task:
+                task.cancel()
+            level = "Полный новичок"
+            qa_text = ""
+            await state.update_data(level=level, qa_text=qa_text)
+        else:
+            level = data.get("level", "")
+            qa_text = data.get("qa_text", "")
+
+        data = await state.get_data()
         weeks = data["months"] * 4
         prompt = track_prompt(
             goal=data["goal"],
@@ -844,18 +861,29 @@ async def _proceed_after_months(message: Message, user_id: int, state: FSMContex
             months=data["months"],
             weeks=weeks,
             qa_text=qa_text,
-            motivation="Личное обучение",
-            format_pref="Любой формат",
-            scope="узкий",
+            motivation=data.get("motivation", "Личное обучение"),
+            format_pref=data.get("format_pref", "Любой формат"),
+            scope=data.get("goal_scope", "широкий"),
         )
         track_task = asyncio.create_task(_fetch_track(prompt))
         _track_tasks[user_id] = track_task
         _search_term_tasks[user_id] = asyncio.create_task(_extract_search_terms(data["goal"]))
-        await message.answer(
-            f"*Цель:* {escape_md(data['goal'])}\n"
-            f"*Время:* {data['hours']} ч/нед · {data['months']} мес",
-            reply_markup=kb_build(),
-        )
+
+        if data.get("goal_scope") == "узкий":
+            profile_text = (
+                f"*Цель:* {escape_md(data['goal'])}\n"
+                f"*Время:* {data['hours']} ч/нед · {data['months']} мес"
+            )
+        else:
+            profile_text = (
+                f"*Твой профиль*\n\n"
+                f"*Цель:* {escape_md(data['goal'])}\n"
+                f"*Уровень:* {level}\n\n"
+                f"*Мотивация:* {data.get('motivation', '')}\n"
+                f"*Формат:* {data.get('format_pref', '')}\n"
+                f"*Время:* {data['hours']} ч/нед · {data['months']} мес"
+            )
+        await message.answer(profile_text, reply_markup=kb_build())
         await state.set_state(Form.track)
     else:
         await message.answer(
@@ -1020,37 +1048,14 @@ async def got_answer(callback: CallbackQuery, state: FSMContext):
         qa_lines.append(f"В{i + 1}: {q_text}\nОтвет {a}: {option_text}")
     qa_text = "\n\n".join(qa_lines)
 
-    await state.update_data(level=level, qa_text=qa_text)
+    await state.update_data(level=level, qa_text=qa_text, quiz_done=True)
 
-    # Запускаем генерацию трека фоново, пока пользователь видит сообщение об уровне
-    weeks = data["months"] * 4
-    prompt = track_prompt(
-        goal=data["goal"],
-        level=level,
-        hours=data["hours"],
-        months=data["months"],
-        weeks=weeks,
-        qa_text=qa_text,
-        motivation=data.get("motivation", ""),
-        format_pref=data.get("format_pref", ""),
-        scope=data.get("goal_scope", "широкий"),
-    )
-    track_task = asyncio.create_task(_fetch_track(prompt))
-    _track_tasks[callback.from_user.id] = track_task
-    _search_term_tasks[callback.from_user.id] = asyncio.create_task(_extract_search_terms(data["goal"]))
-
-    motivation = data.get("motivation", "")
-    format_pref = data.get("format_pref", "")
     await callback.message.answer(
-        f"*Твой профиль*\n\n"
-        f"*Цель:* {escape_md(data['goal'])}\n"
-        f"*Уровень:* {level}\n"
-        f"_{level_desc}_\n\n"
-        f"*Мотивация:* {motivation}\n"
-        f"*Формат:* {format_pref}\n"
-        f"*Время:* {data['hours']} ч/нед · {data['months']} мес",
-        reply_markup=kb_build(),
+        f"*Уровень определён:* {level}\n_{level_desc}_\n\n"
+        f"Последний шаг — укажи, сколько времени готов уделять учёбе.",
+        reply_markup=kb_hours(),
     )
+    await state.set_state(Form.hours)
 
 
 @dp.callback_query(F.data == "build_track")
