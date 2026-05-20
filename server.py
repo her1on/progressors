@@ -53,9 +53,6 @@ class ProgressRequest(BaseModel):
 _SEARCH_URLS = {
     "youtube": "https://www.youtube.com/results?search_query={}",
     "stepik":  "https://stepik.org/catalog?q={}",
-    "habr":    "https://habr.com/ru/search/?q={}",
-    "rutube":  "https://rutube.ru/search/?query={}",
-    "vk":      "https://vk.com/video?q={}",
 }
 
 async def _parse_materials_with_links(materials: str) -> list[dict]:

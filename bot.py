@@ -285,12 +285,9 @@ def kb_format():
     return InlineKeyboardMarkup(inline_keyboard=[
         [
             InlineKeyboardButton(text="Видео", callback_data="fmt_video"),
-            InlineKeyboardButton(text="Статьи", callback_data="fmt_articles"),
-        ],
-        [
             InlineKeyboardButton(text="Курсы", callback_data="fmt_courses"),
-            InlineKeyboardButton(text="Любой формат", callback_data="fmt_any"),
         ],
+        [InlineKeyboardButton(text="Любой формат", callback_data="fmt_any")],
         [InlineKeyboardButton(text="⬅️ Назад", callback_data="back_format")],
     ])
 
@@ -364,12 +361,8 @@ def escape_md(text: str) -> str:
 
 
 _SOURCE_SEARCH = {
-    "youtube":  "https://www.youtube.com/results?search_query={}",
-    "stepik":   "https://stepik.org/search?query={}",
-    "habr":     "https://habr.com/ru/search/?q={}&target_type=posts",
-    "rutube":   "https://rutube.ru/search/?query={}",
-    "vk":       "https://vk.com/video?q={}",
-    "vk видео": "https://vk.com/video?q={}",
+    "youtube": "https://www.youtube.com/results?search_query={}",
+    "stepik":  "https://stepik.org/search?query={}",
 }
 
 
