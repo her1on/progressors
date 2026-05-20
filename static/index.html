@@ -2262,7 +2262,9 @@ function parseMaterials(text) {
 }
 
 function StageDetail({ stage, goal, level, isLocked, completed, onComplete, onUnlock }) {
-  const mats = parseMaterials(stage.materialsText);
+  const mats = stage.materialsLinks && stage.materialsLinks.length > 0
+    ? stage.materialsLinks
+    : parseMaterials(stage.materialsText);
   return (
     <div className="stage-detail">
       <div className="panel stage-detail-head">
@@ -2550,6 +2552,7 @@ function transformBotStages(botStages, completed, currentStage) {
       topics: topicsArr,
       outcome: s.outcome || "",
       materialsText: s.materials || "",
+      materialsLinks: s.materials_links || null,
       final: idx === (botStages.length - 1),
     };
   });

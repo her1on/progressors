@@ -3,6 +3,7 @@ import hashlib
 import hmac
 import json
 import os
+import re
 import urllib.parse
 from pathlib import Path
 
@@ -15,6 +16,9 @@ from dotenv import load_dotenv
 load_dotenv()
 
 from supabase_client import get_track, update_progress as supabase_update_progress
+from youtube import search_youtube_video
+
+_yt_cache: dict[str, str] = {}
 
 BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
 
@@ -46,12 +50,53 @@ class ProgressRequest(BaseModel):
     current_stage: int
 
 
+_SEARCH_URLS = {
+    "youtube": "https://www.youtube.com/results?search_query={}",
+    "stepik":  "https://stepik.org/catalog?q={}",
+    "habr":    "https://habr.com/ru/search/?q={}",
+    "rutube":  "https://rutube.ru/search/?query={}",
+    "vk":      "https://vk.com/video?q={}",
+}
+
+async def _parse_materials_with_links(materials: str) -> list[dict]:
+    result = []
+    for line in materials.split("\n"):
+        m = re.match(r"\[([^\]\n]+)\]\s+([^\n]+)", line.strip())
+        if not m:
+            continue
+        source = m.group(1).strip()
+        rest = m.group(2).strip()
+        title = rest.split(" — ")[0].strip()
+        base = _SEARCH_URLS.get(source.lower())
+        if not base or not title:
+            continue
+        url = base.format(urllib.parse.quote_plus(title))
+        if source.lower() == "youtube":
+            if title in _yt_cache:
+                url = _yt_cache[title]
+            else:
+                try:
+                    res = await asyncio.to_thread(search_youtube_video, title)
+                    if res:
+                        url, _ = res
+                        _yt_cache[title] = url
+                except Exception:
+                    pass
+        result.append({"source": source, "title": title, "url": url})
+    return result
+
+
 @app.get("/api/webapp/track")
 async def webapp_get_track(x_init_data: str = Header(...)):
     user_id = _verify_init_data(x_init_data)
     track = await asyncio.to_thread(get_track, user_id)
     if not track:
         raise HTTPException(404, "Трек не найден. Пройди онбординг в боте.")
+    stages = track.get("stages") or []
+    tasks = [_parse_materials_with_links(s.get("materials", "")) for s in stages]
+    links_per_stage = await asyncio.gather(*tasks)
+    for s, links in zip(stages, links_per_stage):
+        s["materials_links"] = links
     return track
 
 
