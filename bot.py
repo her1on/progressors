@@ -334,7 +334,7 @@ def linkify_materials(text: str, stage_topic: str = "") -> str:
         rest = m.group(2).strip()
         title = rest.split(" — ")[0].strip()
         title = re.sub(r"\s*\([^)]*\)\s*$", "", title).strip()
-        title = re.sub(r"[\[\]\*\"\'\\]+", "", title).strip()
+        title = re.sub(r"[\[\]\*\"\'\\\_]+", "", title).strip()
         base = _SOURCE_SEARCH.get(source.lower())
         if not base or not title:
             return m.group(0)
