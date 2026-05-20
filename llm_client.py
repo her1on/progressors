@@ -1,8 +1,10 @@
 import os
+import threading
 import time
 from openai import OpenAI
 
 _client: OpenAI | None = None
+_sem = threading.Semaphore(3)
 
 
 def _get_client() -> OpenAI:
@@ -20,10 +22,11 @@ def call_llm(prompt: str, model: str = "gpt-5.5") -> str:
     client = _get_client()
     for attempt in range(3):
         try:
-            response = client.chat.completions.create(
-                model=model,
-                messages=[{"role": "user", "content": prompt}],
-            )
+            with _sem:
+                response = client.chat.completions.create(
+                    model=model,
+                    messages=[{"role": "user", "content": prompt}],
+                )
             return response.choices[0].message.content
         except Exception:
             if attempt == 2:
