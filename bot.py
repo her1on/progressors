@@ -1346,26 +1346,30 @@ async def build_track(callback: CallbackQuery, state: FSMContext):
     await _send_stage(callback.message, state, 0)
 
 
-async def _resolve_youtube_links(text: str, used_ids: set[str], max_videos: int = 2) -> str:
+async def _resolve_youtube_links(text: str, used_ids: set[str], max_videos: int = 2, context: str = "") -> str:
     """Replace YouTube search URLs with direct video URLs via API, skipping already-used video IDs."""
     pattern = re.compile(
         r"\[YouTube: ([^\]]+)\]\((https://www\.youtube\.com/results\?search_query=[^)]+)\)"
     )
+    # Берём первое слово контекста (например "Python") чтобы уточнить поиск
+    context_word = context.split()[0] if context else ""
     resolved = 0
     for title, search_url in pattern.findall(text):
         if resolved >= max_videos:
             break
+        # Добавляем тему если она не упомянута в названии видео
+        query = title if (not context_word or context_word.lower() in title.lower()) else f"{title} {context_word}"
         try:
-            result = await asyncio.to_thread(search_youtube_video, title, used_ids)
+            result = await asyncio.to_thread(search_youtube_video, query, used_ids)
             if result:
                 video_url, video_id = result
                 used_ids.add(video_id)
                 text = text.replace(search_url, video_url)
                 resolved += 1
             else:
-                logger.warning(f"YouTube API returned None for {title!r}")
+                logger.warning(f"YouTube API returned None for {query!r}")
         except Exception as e:
-            logger.warning(f"YouTube resolve failed for {title!r}: {e}")
+            logger.warning(f"YouTube resolve failed for {query!r}: {e}")
     return text
 
 
@@ -1404,7 +1408,7 @@ async def _send_stage(message: Message, state: FSMContext, idx: int, edit: bool 
     stage_difficulty = {"simplified": "easy", "advanced": "hard"}.get(stage.get("modified", ""))
 
     text = format_stage(stage, idx, len(stages))
-    text = await _resolve_youtube_links(text, used_ids)
+    text = await _resolve_youtube_links(text, used_ids, context=data.get("goal", ""))
     await state.update_data(used_video_ids=list(used_ids))
     text = await _resolve_stepik_links(text, stage_difficulty)
 
