@@ -460,7 +460,7 @@ def parse_track(text: str) -> tuple[list[dict], str]:
             r"\n\*{0,2}Результат:?\*{0,2}\s*(.+?)(?=\n#{2,3}|\Z)",
             part, re.DOTALL | re.IGNORECASE,
         )
-        outcome = outcome_m.group(1).strip().replace("\n", " ") if outcome_m else ""
+        outcome = re.sub(r"[-–—]{2,}", "", outcome_m.group(1).strip().replace("\n", " ")).strip() if outcome_m else ""
 
         # Если ничего не распарсилось — берём весь текст блока как topics
         if not topics and not materials:

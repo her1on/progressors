@@ -2225,7 +2225,7 @@ function Constellation({ stages, activeId, completedIds, onPick }) {
   const NODE_H = 84; // matches gap+row height
   return (
     <div className="panel panel-pad" style={{ padding: "22px 18px" }}>
-      <div className="eyebrow" style={{ paddingLeft: 8, marginBottom: 16 }}>созвездие · {stages.length} этапов</div>
+      <div className="eyebrow" style={{ paddingLeft: 8, marginBottom: 16 }}>маршрут · {stages.length} этапов</div>
       <div className="constellation">
         <svg className="constellation-svg" preserveAspectRatio="none">
           {stages.map((s, i) => {
