@@ -21,7 +21,7 @@ from aiogram.types import (
     LinkPreviewOptions,
     Message,
     ReplyKeyboardMarkup,
-    MenuButtonCommands,
+    MenuButtonDefault,
     MenuButtonWebApp,
     WebAppInfo,
 )
@@ -1697,7 +1697,7 @@ async def on_startup(bot: Bot) -> None:
     await bot.delete_webhook(drop_pending_updates=True)
     await bot.set_webhook(url=webhook_url, secret_token=WEBHOOK_SECRET, drop_pending_updates=True)
     logger.info(f"Webhook registered: {webhook_url}")
-    await bot.set_chat_menu_button(menu_button=MenuButtonCommands())
+    await bot.set_chat_menu_button(menu_button=MenuButtonDefault())
     await bot.set_my_commands([
         BotCommand(command="start", description="Начать / перезапустить"),
         BotCommand(command="progress", description="Мой прогресс по треку"),
