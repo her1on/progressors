@@ -56,6 +56,14 @@ from supabase_client import (
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+
+async def _bg(coro, label: str = ""):
+    try:
+        await coro
+    except Exception as e:
+        logger.error(f"[BG] {label or 'task'} failed: {e!r}")
+
+
 BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 
 bot = Bot(token=BOT_TOKEN, default=DefaultBotProperties(parse_mode="Markdown"))
@@ -1752,15 +1760,7 @@ async def stage_like(callback: CallbackQuery, state: FSMContext):
         return
     stages[idx]["liked"] = True
     await state.update_data(stages=stages)
-    asyncio.create_task(asyncio.to_thread(_sb_update_stages, callback.from_user.id, stages))
-    asyncio.create_task(asyncio.to_thread(
-        _sb_save_liked_stage,
-        callback.from_user.id,
-        data.get("goal", ""),
-        stages[idx]["title"],
-        stages[idx].get("topics", ""),
-        stages[idx].get("materials", ""),
-    ))
+    asyncio.create_task(_bg(asyncio.to_thread(_sb_update_stages, callback.from_user.id, stages), "update_stages:like"))
     is_last = idx == len(stages) - 1
     await callback.message.edit_reply_markup(reply_markup=kb_stage(idx, is_last, "liked"))
     await callback.answer("❤️ Этап сохранён как понравившийся!")
@@ -1811,8 +1811,7 @@ async def stage_hard(callback: CallbackQuery, state: FSMContext):
     stages[idx]["modified"] = "simplified"
     stages[idx]["disliked"] = True
     await state.update_data(stages=stages)
-    asyncio.create_task(asyncio.to_thread(_sb_update_stages, callback.from_user.id, stages))
-    asyncio.create_task(asyncio.to_thread(_sb_update_difficulty_bias, callback.from_user.id, "hard"))
+    asyncio.create_task(_bg(asyncio.to_thread(_sb_update_stages, callback.from_user.id, stages), "update_stages:hard"))
     await msg.delete()
     try:
         await _send_stage(callback.message, state, idx)
@@ -1844,8 +1843,7 @@ async def stage_easy(callback: CallbackQuery, state: FSMContext):
     stages[idx]["modified"] = "advanced"
     stages[idx]["disliked"] = True
     await state.update_data(stages=stages)
-    asyncio.create_task(asyncio.to_thread(_sb_update_stages, callback.from_user.id, stages))
-    asyncio.create_task(asyncio.to_thread(_sb_update_difficulty_bias, callback.from_user.id, "easy"))
+    asyncio.create_task(_bg(asyncio.to_thread(_sb_update_stages, callback.from_user.id, stages), "update_stages:easy"))
     await msg.delete()
     try:
         await _send_stage(callback.message, state, idx)

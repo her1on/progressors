@@ -9,12 +9,12 @@ logger = logging.getLogger(__name__)
 SUPABASE_URL = os.getenv("SUPABASE_URL", "")
 SUPABASE_KEY = os.getenv("SUPABASE_SECRET_KEY", "")
 
-_HEADERS = {
+_HEADERS_BASE = {
     "Content-Type": "application/json",
     "apikey": SUPABASE_KEY,
     "Authorization": f"Bearer {SUPABASE_KEY}",
-    "Prefer": "resolution=merge-duplicates",
 }
+_HEADERS_UPSERT = {**_HEADERS_BASE, "Prefer": "resolution=merge-duplicates"}
 
 
 def _request(method: str, path: str, body: dict | None = None, prefer: str | None = None) -> dict | list | None:
@@ -22,7 +22,12 @@ def _request(method: str, path: str, body: dict | None = None, prefer: str | Non
         return None
     url = f"{SUPABASE_URL}/rest/v1/{path}"
     data = json.dumps(body).encode() if body else None
-    headers = {**_HEADERS, "Prefer": prefer} if prefer else _HEADERS
+    if prefer:
+        headers = {**_HEADERS_BASE, "Prefer": prefer}
+    elif method == "POST":
+        headers = _HEADERS_UPSERT
+    else:
+        headers = _HEADERS_BASE
     req = urllib.request.Request(url, data=data, headers=headers, method=method)
     try:
         with urllib.request.urlopen(req, timeout=5) as resp:
