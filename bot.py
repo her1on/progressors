@@ -47,9 +47,7 @@ from supabase_client import (
     update_progress as _sb_update_progress,
     update_stages as _sb_update_stages,
     get_track as _sb_get_track,
-    save_liked_stage as _sb_save_liked_stage,
     get_liked_stages as _sb_get_liked_stages,
-    update_difficulty_bias as _sb_update_difficulty_bias,
     get_difficulty_bias as _sb_get_difficulty_bias,
 )
 
@@ -390,10 +388,8 @@ _SOURCE_SEARCH = {
 }
 
 
-def linkify_materials(text: str, stage_topic: str = "") -> str:
+def linkify_materials(text: str) -> str:
     """Превращает [YouTube] Название — Канал в кликабельную ссылку на поиск."""
-    habr_query = " ".join(stage_topic.split()[:3]) if stage_topic else ""
-
     filtered = []
     for line in text.split("\n"):
         m = re.search(r"\[([^\]\n]+)\]", line)
@@ -411,11 +407,7 @@ def linkify_materials(text: str, stage_topic: str = "") -> str:
         base = _SOURCE_SEARCH.get(source.lower())
         if not base or not title:
             return m.group(0)
-        if source.lower() == "habr":
-            query = habr_query or " ".join(title.split()[:3])
-        else:
-            query = title
-        url = base.format(urllib.parse.quote_plus(query))
+        url = base.format(urllib.parse.quote_plus(title))
         return f"[{source}: {title}]({url})"
 
     return re.sub(r"\[([^\]\n]+)\]\s+([^\n\[]+)", replace, text)
@@ -558,7 +550,7 @@ def format_stage(stage: dict, idx: int, total: int) -> str:
         materials = _limit_source_lines(materials, "YouTube", 2)
         materials = _limit_source_lines(materials, "GitHub", 0)
         if materials:
-            text += f"*Материалы:*\n{linkify_materials(materials, stage['title'])}\n\n"
+            text += f"*Материалы:*\n{linkify_materials(materials)}\n\n"
     if stage.get("outcome"):
         text += f"*Результат:* _{stage['outcome']}_\n"
     text += "\n_Изучи материалы и оцени этап 👇_"
@@ -1076,10 +1068,9 @@ MOTIVATION_LABELS = {
 }
 
 FORMAT_LABELS = {
-    "fmt_video":    "Видео",
-    "fmt_articles": "Статьи",
-    "fmt_courses":  "Курсы",
-    "fmt_any":      "Любой формат",
+    "fmt_video":   "Видео",
+    "fmt_courses": "Курсы",
+    "fmt_any":     "Любой формат",
 }
 
 

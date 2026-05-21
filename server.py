@@ -4,11 +4,9 @@ import hmac
 import json
 import logging
 import os
-import re
 import urllib.parse
 from pathlib import Path
 
-import redis.asyncio as aioredis
 import requests as _requests
 from fastapi import FastAPI, Header, HTTPException
 from fastapi.staticfiles import StaticFiles
@@ -19,23 +17,8 @@ from dotenv import load_dotenv
 load_dotenv()
 
 from supabase_client import get_track, update_progress as supabase_update_progress, update_stages as supabase_update_stages
-from youtube import search_youtube_video
-from stepik import search_stepik_courses
 
 logger = logging.getLogger(__name__)
-
-_yt_cache: dict[str, tuple[str, str]] = {}
-_stepik_cache: dict[str, list[dict]] = {}
-
-_redis: aioredis.Redis | None = None
-
-def _get_redis() -> aioredis.Redis | None:
-    global _redis
-    if _redis is None:
-        url = os.getenv("REDIS_URL")
-        if url:
-            _redis = aioredis.from_url(url, decode_responses=True)
-    return _redis
 
 BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
 
@@ -70,90 +53,6 @@ class ProgressRequest(BaseModel):
 class StageFeedbackRequest(BaseModel):
     stage_idx: int
     feedback: str  # "liked" или "disliked"
-
-
-_SEARCH_URLS = {
-    "youtube": "https://www.youtube.com/results?search_query={}",
-    "stepik":  "https://stepik.org/catalog?q={}",
-}
-
-async def _parse_materials_with_links(materials: str) -> list[dict]:
-    result = []
-    yt_count = 0
-    for line in materials.split("\n"):
-        m = re.match(r"\[([^\]\n]+)\]\s+([^\n]+)", line.strip())
-        if not m:
-            continue
-        source = m.group(1).strip()
-        if source.lower() == "stepik":
-            continue  # добавляется отдельно через Stepik API
-        rest = m.group(2).strip()
-        title = rest.split(" — ")[0].strip()
-        base = _SEARCH_URLS.get(source.lower())
-        if not base or not title:
-            continue
-        if source.lower() == "youtube":
-            if yt_count >= 2:
-                continue
-            video_url = None
-            thumb = None
-            r = _get_redis()
-            rkey = f"yt:{title}"
-            if r:
-                cached = await r.get(rkey)
-                if cached:
-                    data = json.loads(cached)
-                    video_url, vid_id = data["url"], data["vid"]
-                    thumb = f"https://img.youtube.com/vi/{vid_id}/mqdefault.jpg"
-            elif title in _yt_cache:
-                video_url, vid_id = _yt_cache[title]
-                thumb = f"https://img.youtube.com/vi/{vid_id}/mqdefault.jpg"
-            if not video_url:
-                try:
-                    res = await asyncio.to_thread(search_youtube_video, title)
-                    if res:
-                        video_url, vid_id = res
-                        thumb = f"https://img.youtube.com/vi/{vid_id}/mqdefault.jpg"
-                        if r:
-                            await r.setex(rkey, 86400, json.dumps({"url": video_url, "vid": vid_id}))
-                        else:
-                            _yt_cache[title] = (video_url, vid_id)
-                except Exception:
-                    pass
-            if video_url:
-                yt_count += 1
-                result.append({"source": source, "title": title, "url": video_url, "thumb": thumb})
-    return result
-
-
-async def _stepik_links_for_stage(stage: dict, goal: str = "") -> list[dict]:
-    query = stage.get("title", "") or goal
-    if not query:
-        return []
-    mem_key = f"{query}|{goal}"
-    r = _get_redis()
-    rkey = f"stepik:{mem_key}"
-    if r:
-        cached = await r.get(rkey)
-        if cached:
-            return json.loads(cached)
-    elif mem_key in _stepik_cache:
-        return _stepik_cache[mem_key]
-    try:
-        courses = await asyncio.to_thread(search_stepik_courses, query, 0, 2, None, goal or None)
-        links = [
-            {"source": "Stepik", "title": c["title"], "url": c["url"], "thumb": None}
-            for c in courses
-        ]
-    except Exception:
-        links = []
-    if not links:
-        links = [{"source": "Stepik", "title": "Курсы не найдены", "url": "", "thumb": None}]
-    if r:
-        await r.setex(rkey, 3600, json.dumps(links))
-    else:
-        _stepik_cache[mem_key] = links
-    return links
 
 
 @app.get("/api/webapp/track")

@@ -80,11 +80,6 @@ def get_track(user_id: int) -> dict | None:
     return None
 
 
-def save_liked_stage(user_id: int, goal: str, stage_title: str, topics: str, materials: str) -> None:
-    """Данные уже сохранены в user_tracks.stages с флагом liked=True — ничего не делаем."""
-    pass
-
-
 def get_liked_stages(user_id: int) -> list[dict]:
     """Извлекает лайкнутые этапы из истории user_tracks."""
     result = _request("GET", f"user_tracks?user_id=eq.{user_id}&select=goal,stages&order=updated_at.desc&limit=10")
@@ -102,11 +97,6 @@ def get_liked_stages(user_id: int) -> list[dict]:
                     "materials": stage.get("materials", ""),
                 })
     return liked[:20]
-
-
-def update_difficulty_bias(user_id: int, direction: str) -> None:
-    """Данные уже сохранены в user_tracks.stages с флагом modified — ничего не делаем."""
-    pass
 
 
 def get_difficulty_bias(user_id: int) -> dict:
