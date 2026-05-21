@@ -37,11 +37,13 @@ def search_stepik_courses(query: str, budget: int, limit: int = 5, difficulty: s
         if budget > 0 and price > budget:
             continue
 
+        score = float(course.get("score") or 0)
         filtered.append({
             "title": title,
             "url": f"https://stepik.org/course/{course.get('id')}/promo",
             "price": int(price),
             "learners": learners,
+            "score": score,
             "difficulty": (course.get("difficulty") or "").lower(),
         })
 
@@ -59,7 +61,7 @@ def search_stepik_courses(query: str, budget: int, limit: int = 5, difficulty: s
         filtered = [c for c in filtered if c["difficulty"] == difficulty]
 
     paid = sorted([c for c in filtered if c["price"] >= 500], key=lambda c: c["price"], reverse=True)[:2]
-    free = sorted([c for c in filtered if c["price"] == 0], key=lambda c: c["learners"], reverse=True)
+    free = sorted([c for c in filtered if c["price"] == 0], key=lambda c: c["learners"] * (c["score"] or 1), reverse=True)
     result = paid + free
 
     return [
