@@ -1100,6 +1100,9 @@ async def _proceed_after_months(message: Message, user_id: int, state: FSMContex
             )
         except Exception:
             liked_stages, difficulty_bias = [], {"hard_count": 0, "easy_count": 0}
+        logger.info(f"[MEMORY] user={user_id} liked={len(liked_stages)} stages, bias={difficulty_bias}")
+        for s in liked_stages:
+            logger.info(f"[MEMORY] liked stage: goal={s.get('goal')!r} title={s.get('stage_title')!r}")
         prompt = track_prompt(
             goal=data["goal"],
             level=level,
