@@ -29,7 +29,7 @@ def search_youtube_video(query: str, exclude_ids: set[str] | None = None) -> tup
             "type": "video",
             "maxResults": 5,
             "relevanceLanguage": "ru",
-            "order": "viewCount",
+            "order": "relevance",
         }, timeout=10)
         if not resp.ok:
             logger.warning(f"YouTube API {resp.status_code}: {resp.text[:300]}")
