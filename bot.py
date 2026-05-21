@@ -1739,9 +1739,9 @@ async def stage_like(callback: CallbackQuery, state: FSMContext):
         _sb_save_liked_stage,
         callback.from_user.id,
         data.get("goal", ""),
-        stage["title"],
-        stage.get("topics", ""),
-        stage.get("materials", ""),
+        stages[idx]["title"],
+        stages[idx].get("topics", ""),
+        stages[idx].get("materials", ""),
     ))
     is_last = idx == len(stages) - 1
     await callback.message.edit_reply_markup(reply_markup=kb_stage(idx, is_last, "liked"))
