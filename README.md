@@ -2,7 +2,6 @@
 
 Telegram-бот и Mini App для построения персонального трека онлайн-обучения. Пользователь называет цель — система диагностирует уровень, строит поэтапный маршрут с реальными материалами и адаптирует его по ходу прохождения.
 
-**Хакатон:** True Tech Arena 2026
 **Бот:** [@progressors_bot](https://t.me/progressors_bot)
 
 ---
@@ -85,7 +84,7 @@ WEBAPP_URL=http://localhost:8000
 ### Установка и запуск
 
 ```bash
-git clone https://git.truetecharena.ru/tta/system-hack-tomsk-2026/kollokvium/task-repo.git progressors
+git clone https://github.com/her1on/progressors.git progressors
 cd progressors
 pip install -r requirements.txt
 
