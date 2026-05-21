@@ -1537,12 +1537,11 @@ async def _send_stage(message: Message, state: FSMContext, idx: int, edit: bool 
             stages[idx] = stage
             await state.update_data(stages=stages)
 
-        # Fallback: пробуем 3 → 2 → 1 слово из LLM-запроса
+        # Fallback: полный запрос → последние 2 слова → последнее слово (существительное в конце)
         words = sp["query"].split()
         seen: set[str] = set()
         queries = []
-        for n in (3, 2, 1):
-            q = " ".join(words[:n])
+        for q in (sp["query"], " ".join(words[-2:]), words[-1]):
             if q and q not in seen:
                 seen.add(q)
                 queries.append(q)
