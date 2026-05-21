@@ -41,7 +41,7 @@ from llm_client import call_llm
 from level import parse_questions
 from stepik import search_stepik_courses
 from youtube import search_youtube_video
-from supabase_client import save_track as _sb_save_track, update_progress as _sb_update_progress, update_stages as _sb_update_stages
+from supabase_client import save_track as _sb_save_track, update_progress as _sb_update_progress, update_stages as _sb_update_stages, get_track as _sb_get_track
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -1567,6 +1567,30 @@ async def stage_prev(callback: CallbackQuery, state: FSMContext):
 @dp.callback_query(F.data == "noop")
 async def noop_handler(callback: CallbackQuery):
     await callback.answer("Ты уже оценил этот этап")
+
+
+@dp.callback_query(F.data == "webapp_continue")
+async def webapp_continue(callback: CallbackQuery, state: FSMContext):
+    await callback.answer()
+    await callback.message.edit_reply_markup(reply_markup=None)
+    track = await asyncio.to_thread(_sb_get_track, callback.from_user.id)
+    if not track:
+        await callback.message.answer("Трек не найден. Начни с /start")
+        return
+    completed = track.get("completed") or []
+    current_stage = track.get("current_stage") or 0
+    await state.update_data(
+        stages=track.get("stages") or [],
+        completed=completed,
+        current_stage=current_stage,
+        goal=track.get("goal") or "",
+        level=track.get("level") or "",
+        hours=track.get("hours") or 0,
+        months=track.get("months") or 0,
+        goal_scope=track.get("goal_scope") or "",
+    )
+    await state.set_state(Form.track)
+    await _send_stage(callback.message, state, current_stage)
 
 
 @dp.callback_query(Form.track, F.data.startswith("like_"))

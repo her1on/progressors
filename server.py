@@ -2,12 +2,14 @@ import asyncio
 import hashlib
 import hmac
 import json
+import logging
 import os
 import re
 import urllib.parse
 from pathlib import Path
 
 import redis.asyncio as aioredis
+import requests as _requests
 from fastapi import FastAPI, Header, HTTPException
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
@@ -19,6 +21,8 @@ load_dotenv()
 from supabase_client import get_track, update_progress as supabase_update_progress, update_stages as supabase_update_stages
 from youtube import search_youtube_video
 from stepik import search_stepik_courses
+
+logger = logging.getLogger(__name__)
 
 _yt_cache: dict[str, tuple[str, str]] = {}
 _stepik_cache: dict[str, list[dict]] = {}
@@ -161,10 +165,43 @@ async def webapp_get_track(x_init_data: str = Header(...)):
     return track
 
 
+def _notify_bot(user_id: int, completed: list[int], current_stage: int) -> None:
+    token = BOT_TOKEN
+    if not token:
+        return
+    done_idx = current_stage - 1
+    track = get_track(user_id)
+    stages = (track or {}).get("stages") or []
+    total = len(stages)
+    if done_idx >= 0 and done_idx < total:
+        done_title = stages[done_idx].get("title", f"Этап {done_idx + 1}")
+        text = f"✅ *{done_title}* отмечен пройденным в мини-апп."
+    else:
+        text = "✅ Прогресс обновлён в мини-апп."
+
+    if current_stage < total:
+        next_title = stages[current_stage].get("title", f"Этап {current_stage + 1}")
+        text += f"\n\nСледующий: *{next_title}*"
+        keyboard = {"inline_keyboard": [[{"text": "➡️ Открыть в боте", "callback_data": "webapp_continue"}]]}
+    else:
+        text += "\n\n🎉 Маршрут завершён!"
+        keyboard = {"inline_keyboard": [[{"text": "🏁 Завершить в боте", "callback_data": "webapp_continue"}]]}
+
+    try:
+        _requests.post(
+            f"https://api.telegram.org/bot{token}/sendMessage",
+            json={"chat_id": user_id, "text": text, "parse_mode": "Markdown", "reply_markup": keyboard},
+            timeout=5,
+        )
+    except Exception as e:
+        logger.warning(f"Bot notify failed: {e}")
+
+
 @app.post("/api/webapp/progress")
 async def webapp_update_progress(req: ProgressRequest, x_init_data: str = Header(...)):
     user_id = _verify_init_data(x_init_data)
     await asyncio.to_thread(supabase_update_progress, user_id, req.completed, req.current_stage)
+    asyncio.create_task(asyncio.to_thread(_notify_bot, user_id, req.completed, req.current_stage))
     return {"ok": True}
 
 
