@@ -542,7 +542,8 @@ def format_stage(stage: dict, idx: int, total: int) -> str:
         if materials:
             text += f"*Материалы:*\n{linkify_materials(materials, stage['title'])}\n\n"
     if stage.get("outcome"):
-        text += f"*Результат:* _{stage['outcome']}_"
+        text += f"*Результат:* _{stage['outcome']}_\n"
+    text += "\n_Изучи материалы и оцени этап 👇_"
     return text[:4000]
 
 
