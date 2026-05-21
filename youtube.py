@@ -24,7 +24,7 @@ def search_youtube_video(query: str, exclude_ids: set[str] | None = None) -> tup
     try:
         resp = requests.get(SEARCH_URL, params={
             "key": key,
-            "q": query + " на русском",
+            "q": query,
             "part": "snippet",
             "type": "video",
             "maxResults": 5,
