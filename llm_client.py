@@ -13,7 +13,8 @@ def _get_client() -> OpenAI:
         _client = OpenAI(
             api_key=os.getenv("CODEX_API_KEY"),
             base_url="https://codex.sale/v1",
-            timeout=90,
+            timeout=30,
+            max_retries=0,
         )
     return _client
 
