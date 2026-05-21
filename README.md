@@ -79,10 +79,13 @@ REDIS_URL=...
 WEBAPP_URL=http://localhost:8000
 ```
 
+> `REDIS_URL` — опционально. Без него FSM хранится в памяти (состояние сбрасывается при перезапуске).  
+> `RAILWAY_PUBLIC_DOMAIN` — только для production webhook на Render. Локально не нужен — бот автоматически запустится в polling режиме.
+
 ### Установка и запуск
 
 ```bash
-git clone https://github.com/her1on/progressors.git
+git clone https://git.truetecharena.ru/tta/system-hack-tomsk-2026/kollokvium/task-repo.git progressors
 cd progressors
 pip install -r requirements.txt
 

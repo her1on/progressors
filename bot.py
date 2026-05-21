@@ -1743,7 +1743,7 @@ if not WEBHOOK_SECRET:
 async def on_startup(bot: Bot) -> None:
     domain = os.getenv("RAILWAY_PUBLIC_DOMAIN", "")
     if not domain:
-        logger.error("RAILWAY_PUBLIC_DOMAIN not set — webhook will not work!")
+        logger.warning("RAILWAY_PUBLIC_DOMAIN not set — running in polling mode")
         return
     webhook_url = f"https://{domain}{WEBHOOK_PATH}"
     await bot.delete_webhook(drop_pending_updates=True)
@@ -1758,16 +1758,32 @@ async def on_shutdown(bot: Bot) -> None:
 
 
 if __name__ == "__main__":
-    from aiohttp import web
-    from aiogram.webhook.aiohttp_server import SimpleRequestHandler, setup_application
+    domain = os.getenv("RAILWAY_PUBLIC_DOMAIN", "")
 
-    dp.startup.register(on_startup)
-    dp.shutdown.register(on_shutdown)
+    if domain:
+        # Webhook mode (production on Render)
+        from aiohttp import web
+        from aiogram.webhook.aiohttp_server import SimpleRequestHandler, setup_application
 
-    app = web.Application()
-    SimpleRequestHandler(dispatcher=dp, bot=bot, secret_token=WEBHOOK_SECRET).register(app, path=WEBHOOK_PATH)
-    setup_application(app, dp, bot=bot)
+        dp.startup.register(on_startup)
+        dp.shutdown.register(on_shutdown)
 
-    port = int(os.getenv("PORT", 8080))
-    logger.info(f"Starting webhook server on port {port}")
-    web.run_app(app, host="0.0.0.0", port=port)
+        app = web.Application()
+        SimpleRequestHandler(dispatcher=dp, bot=bot, secret_token=WEBHOOK_SECRET).register(app, path=WEBHOOK_PATH)
+        setup_application(app, dp, bot=bot)
+
+        port = int(os.getenv("PORT", 8080))
+        logger.info(f"Starting webhook server on port {port}")
+        web.run_app(app, host="0.0.0.0", port=port)
+    else:
+        # Polling mode (local development / Docker without public domain)
+        import asyncio as _asyncio
+
+        async def _run_polling():
+            await bot.delete_webhook(drop_pending_updates=True)
+            await bot.set_chat_menu_button(menu_button=MenuButtonDefault())
+            await bot.delete_my_commands()
+            logger.info("Starting in polling mode")
+            await dp.start_polling(bot)
+
+        _asyncio.run(_run_polling())
