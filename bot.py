@@ -578,6 +578,7 @@ async def cmd_help(message: Message):
         "*Команды:*\n"
         "/start — начать или перезапустить\n"
         "/progress — прогресс по текущему треку\n"
+        "/export — экспорт трека текстом\n"
         "/cancel — отменить текущий процесс\n"
         "/help — эта справка\n\n"
         "*На каждом этапе трека можно:*\n"
@@ -622,6 +623,50 @@ async def cmd_progress(message: Message, state: FSMContext):
         f"Пройдено: {done} из {total} этапов\n\n"
         f"Сейчас: Этап {current + 1} — _{escape_md(stages[current]['title'])}_"
     )
+
+
+@dp.message(Command("export"))
+async def cmd_export(message: Message, state: FSMContext):
+    data = await state.get_data()
+    stages = data.get("stages")
+    if not stages:
+        await message.answer("У тебя пока нет активного трека. Начни с /start")
+        return
+
+    goal = data.get("goal", "")
+    level = data.get("level", "")
+    hours = data.get("hours", 0)
+    months = data.get("months", 0)
+    completed = data.get("completed", [])
+    total = len(stages)
+    done = len(completed)
+    pct = round(done / total * 100) if total else 0
+    current = min(data.get("current_stage", 0), total - 1)
+
+    lines = [
+        f"📚 *Твой трек: {escape_md(goal)}*\n",
+        f"⭐ Уровень: {escape_md(level)}",
+        f"⏱ {hours} ч/нед · {months} мес\n",
+        "━━━━━━━━━━━━━━━",
+    ]
+
+    for i, s in enumerate(stages):
+        status = "✅ Пройдено" if i in completed else ("▶️ Текущий" if i == current else "⬜ Впереди")
+        lines.append(f"\n*Этап {i + 1} · {escape_md(s['title'])}* ({s.get('weeks', '?')} нед) — {status}")
+        for topic in (s.get("topics") or "").split("\n"):
+            t = topic.strip().lstrip("-•*· ")
+            if len(t) > 4:
+                lines.append(f"  • {escape_md(t)}")
+        if s.get("outcome"):
+            lines.append(f"  _→ {escape_md(s['outcome'])}_")
+
+    lines += [
+        "\n━━━━━━━━━━━━━━━",
+        f"Прогресс: {done} из {total} этапов ({pct}%)",
+    ]
+
+    text = "\n".join(lines)
+    await message.answer(text[:4096], parse_mode="Markdown")
 
 
 @dp.message(Command("cancel"))
