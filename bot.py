@@ -1212,7 +1212,7 @@ async def time_warning_change(callback: CallbackQuery, state: FSMContext):
 
 @dp.callback_query(Form.motivation, F.data.startswith("mot_"))
 async def got_motivation(callback: CallbackQuery, state: FSMContext):
-    motivation = MOTIVATION_LABELS[callback.data]
+    motivation = MOTIVATION_LABELS.get(callback.data, "Личное обучение")
     await state.update_data(motivation=motivation)
     await callback.answer()
     try:
@@ -1229,7 +1229,7 @@ async def got_motivation(callback: CallbackQuery, state: FSMContext):
 
 @dp.callback_query(Form.format_pref, F.data.startswith("fmt_"))
 async def got_format(callback: CallbackQuery, state: FSMContext):
-    format_pref = FORMAT_LABELS[callback.data]
+    format_pref = FORMAT_LABELS.get(callback.data, "Любой формат")
     await state.update_data(format_pref=format_pref)
     await callback.answer()
     try:
@@ -1656,9 +1656,9 @@ async def stage_done(callback: CallbackQuery, state: FSMContext):
     if idx not in completed:
         completed.append(idx)
     await state.update_data(completed=completed, current_stage=idx + 1)
-    asyncio.create_task(asyncio.to_thread(
+    asyncio.create_task(_bg(asyncio.to_thread(
         _sb_update_progress, callback.from_user.id, completed, idx + 1
-    ))
+    ), "update_progress:done"))
     await callback.message.edit_reply_markup(reply_markup=None)
     await callback.answer("✅ Отмечено как пройденное!")
     next_idx = idx + 1
@@ -1689,7 +1689,7 @@ async def goto_stage(callback: CallbackQuery, state: FSMContext):
     data = await state.get_data()
     completed = data.get("completed", [])
     await state.update_data(current_stage=idx)
-    asyncio.create_task(asyncio.to_thread(_sb_update_progress, callback.from_user.id, completed, idx))
+    asyncio.create_task(_bg(asyncio.to_thread(_sb_update_progress, callback.from_user.id, completed, idx), "update_progress:goto"))
     try:
         await callback.message.edit_reply_markup(reply_markup=None)
     except Exception:
@@ -1704,7 +1704,7 @@ async def stage_next(callback: CallbackQuery, state: FSMContext):
     data = await state.get_data()
     completed = data.get("completed", [])
     await state.update_data(current_stage=idx + 1)
-    asyncio.create_task(asyncio.to_thread(_sb_update_progress, callback.from_user.id, completed, idx + 1))
+    asyncio.create_task(_bg(asyncio.to_thread(_sb_update_progress, callback.from_user.id, completed, idx + 1), "update_progress:next"))
     await callback.answer()
     await _send_stage(callback.message, state, idx + 1, edit=True)
 
@@ -1716,7 +1716,7 @@ async def stage_prev(callback: CallbackQuery, state: FSMContext):
     data = await state.get_data()
     completed = data.get("completed", [])
     await state.update_data(current_stage=prev_idx)
-    asyncio.create_task(asyncio.to_thread(_sb_update_progress, callback.from_user.id, completed, prev_idx))
+    asyncio.create_task(_bg(asyncio.to_thread(_sb_update_progress, callback.from_user.id, completed, prev_idx), "update_progress:prev"))
     await callback.answer()
     await _send_stage(callback.message, state, prev_idx, edit=True)
 
@@ -1872,7 +1872,7 @@ async def stage_bad(callback: CallbackQuery, state: FSMContext):
     stages[idx]["materials"] = result.strip()
     stages[idx]["modified"] = "alternative"
     await state.update_data(stages=stages)
-    asyncio.create_task(asyncio.to_thread(_sb_update_stages, callback.from_user.id, stages))
+    asyncio.create_task(_bg(asyncio.to_thread(_sb_update_stages, callback.from_user.id, stages), "update_stages:bad"))
     await msg.delete()
     try:
         await _send_stage(callback.message, state, idx)

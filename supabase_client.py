@@ -43,7 +43,7 @@ def _request(method: str, path: str, body: dict | None = None, prefer: str | Non
 
 def save_track(user_id: int, goal: str, level: str, hours: int, months: int,
                goal_scope: str, stages: list, summary: str, skills_text: str = "") -> None:
-    _request("POST", "user_tracks", {
+    _request("POST", "user_tracks?on_conflict=user_id", {
         "user_id": user_id,
         "goal": goal,
         "level": level,

@@ -90,7 +90,7 @@ def search_stepik_courses(
     filtered = [c for c in filtered if not _SCHOOL_RE.search(c["title"])]
 
     # Фильтр релевантности по ключевым словам
-    key_words = [w.lower() for w in (filter_terms or query).split() if len(w) > 4]
+    key_words = [w.lower() for w in (filter_terms or query).split() if len(w) >= 3]
     if key_words:
         filtered = [c for c in filtered if any(kw in c["title"].lower() for kw in key_words)]
 

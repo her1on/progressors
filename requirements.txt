@@ -1,7 +1,6 @@
 openai
 python-dotenv
 requests
-fastapi
-uvicorn[standard]
+aiohttp
 aiogram==3.13.1
 redis
