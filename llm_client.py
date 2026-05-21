@@ -19,7 +19,7 @@ def _get_client() -> OpenAI:
     return _client
 
 
-def call_llm(prompt: str, model: str = "gpt-5.5") -> str:
+def call_llm(prompt: str, model: str = "gpt-5.5", timeout: float | None = None) -> str:
     client = _get_client()
     for attempt in range(3):
         try:
@@ -27,6 +27,7 @@ def call_llm(prompt: str, model: str = "gpt-5.5") -> str:
                 response = client.chat.completions.create(
                     model=model,
                     messages=[{"role": "user", "content": prompt}],
+                    **({"timeout": timeout} if timeout is not None else {}),
                 )
             return response.choices[0].message.content
         except Exception:
