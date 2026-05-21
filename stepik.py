@@ -4,7 +4,7 @@ import requests
 
 
 PRIOR_RATING = 4.0  # ожидаемая оценка курса без отзывов
-PRIOR_WEIGHT = 5    # вес prior (5 «фантомных» отзывов)
+PRIOR_WEIGHT = 15   # вес prior: курс с <15 отзывов существенно штрафуется
 POP_SCALE    = 5    # чем выше — тем меньше влияние популярности
 
 _SCHOOL_RE = re.compile(r'\d+\s*класс', re.IGNORECASE)
