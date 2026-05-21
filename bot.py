@@ -1526,7 +1526,10 @@ async def finish_anyway(callback: CallbackQuery, state: FSMContext):
 @dp.callback_query(Form.track, F.data.startswith("goto_"))
 async def goto_stage(callback: CallbackQuery, state: FSMContext):
     idx = int(callback.data.split("_")[1])
+    data = await state.get_data()
+    completed = data.get("completed", [])
     await state.update_data(current_stage=idx)
+    asyncio.create_task(asyncio.to_thread(_sb_update_progress, callback.from_user.id, completed, idx))
     try:
         await callback.message.edit_reply_markup(reply_markup=None)
     except Exception:
@@ -1538,7 +1541,10 @@ async def goto_stage(callback: CallbackQuery, state: FSMContext):
 @dp.callback_query(Form.track, F.data.startswith("next_"))
 async def stage_next(callback: CallbackQuery, state: FSMContext):
     idx = int(callback.data.split("_")[1])
+    data = await state.get_data()
+    completed = data.get("completed", [])
     await state.update_data(current_stage=idx + 1)
+    asyncio.create_task(asyncio.to_thread(_sb_update_progress, callback.from_user.id, completed, idx + 1))
     await callback.answer()
     await _send_stage(callback.message, state, idx + 1, edit=True)
 
@@ -1547,7 +1553,10 @@ async def stage_next(callback: CallbackQuery, state: FSMContext):
 async def stage_prev(callback: CallbackQuery, state: FSMContext):
     idx = int(callback.data.split("_")[1])
     prev_idx = idx - 1
+    data = await state.get_data()
+    completed = data.get("completed", [])
     await state.update_data(current_stage=prev_idx)
+    asyncio.create_task(asyncio.to_thread(_sb_update_progress, callback.from_user.id, completed, prev_idx))
     await callback.answer()
     await _send_stage(callback.message, state, prev_idx, edit=True)
 
