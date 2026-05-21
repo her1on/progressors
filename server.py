@@ -158,16 +158,6 @@ async def webapp_get_track(x_init_data: str = Header(...)):
     track = await asyncio.to_thread(get_track, user_id)
     if not track:
         raise HTTPException(404, "Трек не найден. Пройди онбординг в боте.")
-    stages = track.get("stages") or []
-    goal = track.get("goal", "")
-    yt_tasks = [_parse_materials_with_links(s.get("materials", "")) for s in stages]
-    st_tasks = [_stepik_links_for_stage(s, goal) for s in stages]
-    yt_results, st_results = await asyncio.gather(
-        asyncio.gather(*yt_tasks),
-        asyncio.gather(*st_tasks),
-    )
-    for s, yt_links, st_links in zip(stages, yt_results, st_results):
-        s["materials_links"] = yt_links + st_links
     return track
 
 

@@ -2354,31 +2354,6 @@ function StageDetail({ stage, goal, level, isLocked, completed, onComplete, onUn
           )}
         </div>
 
-        {mats.length > 0 && (
-          <div className="panel section-card">
-            <h4><span className="pip" /> Материалы</h4>
-            <div className="course-list">
-              {mats.map((m, i) => {
-                const Tag = m.url ? "a" : "div";
-                const linkProps = m.url ? { href: m.url, target: "_blank", rel: "noreferrer" } : {};
-                return (
-                  <Tag key={i} className="course" {...linkProps}
-                       style={!m.url ? { opacity: 0.45, cursor: "default" } : {}}>
-                    {m.thumb
-                      ? <img className="course-thumb" src={m.thumb} alt="" loading="lazy" />
-                      : <div className="course-platform" data-p={m.source.toLowerCase()}>{PLAT_SHORT[m.source.toLowerCase()] || m.source[0]}</div>
-                    }
-                    <div className="course-info">
-                      <div className="course-name">{m.title}</div>
-                      <div className="course-plat-name">{m.source.toUpperCase()}</div>
-                    </div>
-                    <div className="course-price">{m.url ? "→" : "—"}</div>
-                  </Tag>
-                );
-              })}
-            </div>
-          </div>
-        )}
       </div>
 
       <div className="stage-actions">
