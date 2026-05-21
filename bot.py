@@ -1401,14 +1401,19 @@ async def build_track(callback: CallbackQuery, state: FSMContext):
     final_data = await state.get_data()
     search_terms = final_data.get("goal", "").split("—")[0].strip()
 
-    # Сохраняем лайкнутые этапы из старого трека до перезаписи
-    old_stages = final_data.get("stages") or []
-    old_goal = final_data.get("goal", "")
-    if any(s.get("liked") for s in old_stages):
-        asyncio.create_task(_bg(
-            asyncio.to_thread(_sb_save_liked_stages, user_id, old_goal, old_stages),
-            "save_liked_stages",
-        ))
+    # Сохраняем лайкнутые этапы из старого трека до перезаписи (читаем из Supabase, т.к. FSM уже очищен)
+    try:
+        old_track = await asyncio.to_thread(_sb_get_track, user_id)
+        if old_track:
+            old_stages = old_track.get("stages") or []
+            old_goal = old_track.get("goal", "")
+            if any(s.get("liked") for s in old_stages):
+                asyncio.create_task(_bg(
+                    asyncio.to_thread(_sb_save_liked_stages, user_id, old_goal, old_stages),
+                    "save_liked_stages",
+                ))
+    except Exception as e:
+        logger.warning(f"save_liked_stages lookup failed: {e}")
     try:
         liked_stages, difficulty_bias = await asyncio.gather(
             asyncio.to_thread(_sb_get_liked_stages, user_id),
