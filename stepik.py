@@ -2,19 +2,27 @@ import re
 import requests
 
 
-_DIFFICULTY_RANK = {"easy": 0, "medium": 1, "hard": 2}
 _SCHOOL_RE = re.compile(r'\d+\s*класс', re.IGNORECASE)
 
 
-def search_stepik_courses(query: str, budget: int, limit: int = 5, difficulty: str | None = None, filter_terms: str | None = None) -> list[dict[str, str | int]]:
+def search_stepik_courses(
+    query: str,
+    budget: int,
+    limit: int = 5,
+    subject: int | None = None,
+    difficulty: str | None = None,
+    filter_terms: str | None = None,
+) -> list[dict[str, str | int]]:
     url = "https://stepik.org/api/courses"
     params = {
         "search": query,
         "is_public": True,
         "is_archived": False,
         "language": "ru",
-        "page_size": 100
+        "page_size": 100,
     }
+    if subject is not None:
+        params["subject"] = subject
     try:
         response = requests.get(url, params=params, timeout=5)
         response.raise_for_status()
@@ -50,9 +58,7 @@ def search_stepik_courses(query: str, budget: int, limit: int = 5, difficulty: s
     # Исключаем школьные курсы с указанием класса ("2 класс", "10 класс" и т.п.)
     filtered = [c for c in filtered if not _SCHOOL_RE.search(c["title"])]
 
-    # Фильтр релевантности: используем filter_terms (полный исходный запрос), если передан.
-    # Это исключает ложные совпадения — например, сокращённый запрос "двойные"
-    # не должен находить "Двойные диаграммы состояния" вместо курсов по интегралам.
+    # Фильтр релевантности: исключает ложные совпадения по слишком коротким словам
     key_words = [w.lower() for w in (filter_terms or query).split() if len(w) > 4]
     if key_words:
         filtered = [c for c in filtered if any(kw in c["title"].lower() for kw in key_words)]

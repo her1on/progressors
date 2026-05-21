@@ -34,6 +34,7 @@ from bot_prompts import (
     questions_prompt,
     simplify_prompt,
     specialize_prompt,
+    stepik_query_prompt,
     track_prompt,
     validate_prompt,
 )
@@ -1373,6 +1374,20 @@ async def _resolve_youtube_links(text: str, used_ids: set[str], max_videos: int 
     return text
 
 
+async def _get_stepik_params(stage_title: str, topics: str) -> dict:
+    """Возвращает {"subject_id": int|None, "query": str} для поиска в Stepik через LLM."""
+    try:
+        raw = await asyncio.to_thread(call_llm, stepik_query_prompt(stage_title, topics))
+        raw = re.sub(r"```[a-z]*\n?", "", raw).replace("```", "").strip()
+        parsed = json.loads(raw)
+        subject_id = int(parsed.get("subject_id") or 0) or None
+        query = str(parsed.get("query") or stage_title).strip() or stage_title
+        return {"subject_id": subject_id, "query": query}
+    except Exception as e:
+        logger.warning(f"_get_stepik_params failed: {e!r}")
+        return {"subject_id": None, "query": stage_title}
+
+
 async def _resolve_stepik_links(text: str, difficulty: str | None = None) -> str:
     """Заменяет поисковые ссылки Stepik на прямые URL через API."""
     stepik_pattern = re.compile(r"\[Stepik: ([^\]]+)\]\((https://stepik\.org/search\?query=[^)]+)\)")
@@ -1414,8 +1429,16 @@ async def _send_stage(message: Message, state: FSMContext, idx: int, edit: bool 
 
     format_pref = data.get("format_pref", "")
     if format_pref in ("Курсы", "Любой формат", ""):
-        terms = data.get("search_terms") or data.get("goal", stage["title"])
-        words = terms.split()
+        # Получаем LLM-параметры (кэшируем в stage)
+        sp = stage.get("stepik_params")
+        if not sp:
+            sp = await _get_stepik_params(stage["title"], stage.get("topics", ""))
+            stage["stepik_params"] = sp
+            stages[idx] = stage
+            await state.update_data(stages=stages)
+
+        # Fallback: пробуем 3 → 2 → 1 слово из LLM-запроса
+        words = sp["query"].split()
         seen: set[str] = set()
         queries = []
         for n in (3, 2, 1):
@@ -1423,16 +1446,23 @@ async def _send_stage(message: Message, state: FSMContext, idx: int, edit: bool 
             if q and q not in seen:
                 seen.add(q)
                 queries.append(q)
+
         courses = []
         for query in queries:
             try:
-                found = await asyncio.to_thread(search_stepik_courses, query, 0, 3, stage_difficulty, terms)
-                logger.info(f"Stepik search for {query!r} (difficulty={stage_difficulty}): found {len(found)} courses")
+                found = await asyncio.to_thread(
+                    search_stepik_courses, query, 0, 3,
+                    subject=sp.get("subject_id"),
+                    difficulty=stage_difficulty,
+                    filter_terms=sp["query"],
+                )
+                logger.info(f"Stepik {query!r} subject={sp.get('subject_id')} diff={stage_difficulty}: {len(found)}")
                 if found:
                     courses = found
                     break
             except Exception as e:
                 logger.warning(f"Stepik search failed for {query!r}: {e}")
+
         if courses:
             lines = ["\n*Курсы на Stepik:*\n"]
             for c in courses:
