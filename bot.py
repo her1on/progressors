@@ -228,7 +228,9 @@ class Form(StatesGroup):
 def kb_menu():
     return ReplyKeyboardMarkup(
         keyboard=[
-            [KeyboardButton(text="Новый маршрут"), KeyboardButton(text="❓ Помощь")],
+            [KeyboardButton(text="🚀 Новый маршрут"), KeyboardButton(text="❓ Помощь")],
+            [KeyboardButton(text="📊 Прогресс"), KeyboardButton(text="📤 Экспорт")],
+            [KeyboardButton(text="❌ Отмена")],
         ],
         resize_keyboard=True,
         persistent=True,
@@ -598,6 +600,21 @@ async def cmd_help(message: Message):
 @dp.message(F.text.in_({"🚀 Новый маршрут", "Новый маршрут"}))
 async def menu_new_route(message: Message, state: FSMContext):
     await cmd_start(message, state)
+
+
+@dp.message(F.text == "📊 Прогресс")
+async def menu_progress(message: Message, state: FSMContext):
+    await cmd_progress(message, state)
+
+
+@dp.message(F.text == "📤 Экспорт")
+async def menu_export(message: Message, state: FSMContext):
+    await cmd_export(message, state)
+
+
+@dp.message(F.text == "❌ Отмена")
+async def menu_cancel(message: Message, state: FSMContext):
+    await cmd_cancel(message, state)
 
 
 @dp.message(Command("progress"))
