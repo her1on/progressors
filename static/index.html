@@ -2441,9 +2441,11 @@ function TrackScreen({ state, setState, onRestart }) {
   const lvl = LEVELS[state.level] || LEVELS["Средний уровень"];
 
   const firstId = STAGES.length > 0 ? STAGES[0].id : 1;
-  const [activeId, setActiveId]         = useStateT(firstId);
-  const [completed, setCompleted]       = useStateT([]);
-  const [unlocked, setUnlocked]         = useStateT([firstId]);
+  const savedCompleted = (state.completed || []).map(idx => STAGES[idx] ? STAGES[idx].id : idx + 1);
+  const savedCurrentId = STAGES[state.current_stage || 0]?.id || firstId;
+  const [activeId, setActiveId]         = useStateT(savedCurrentId);
+  const [completed, setCompleted]       = useStateT(savedCompleted);
+  const [unlocked, setUnlocked]         = useStateT([...new Set([firstId, savedCurrentId, ...savedCompleted])]);
   const [toast, setToast]               = useStateT(null);
   const [showComplete, setShowComplete] = useStateT(false);
   const [stages, setStages]             = useStateT(STAGES);
@@ -2692,8 +2694,10 @@ function App() {
       fetch("/api/webapp/track", { headers: { "X-Init-Data": tg.initData } })
         .then(r => { if (!r.ok) throw new Error(r.status); return r.json(); })
         .then(data => {
-          const stages = transformBotStages(data.stages || [], data.completed || [], data.current_stage || 0);
-          setState({ goal: data.goal || "", level: data.level || "", hours: data.hours || 0, months: data.months || 0, skills_text: data.skills_text || "", stages, courses: {} });
+          const completed = data.completed || [];
+          const currentStage = data.current_stage || 0;
+          const stages = transformBotStages(data.stages || [], completed, currentStage);
+          setState({ goal: data.goal || "", level: data.level || "", hours: data.hours || 0, months: data.months || 0, skills_text: data.skills_text || "", stages, completed, current_stage: currentStage, courses: {} });
           if (!silent) setLoading(false);
         })
         .catch(() => {
