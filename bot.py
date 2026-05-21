@@ -13,7 +13,6 @@ from aiogram.fsm.state import State, StatesGroup
 from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram.fsm.storage.redis import RedisStorage
 from aiogram.types import (
-    BotCommand,
     CallbackQuery,
     InlineKeyboardButton,
     InlineKeyboardMarkup,
@@ -1715,13 +1714,7 @@ async def on_startup(bot: Bot) -> None:
     await bot.set_webhook(url=webhook_url, secret_token=WEBHOOK_SECRET, drop_pending_updates=True)
     logger.info(f"Webhook registered: {webhook_url}")
     await bot.set_chat_menu_button(menu_button=MenuButtonDefault())
-    await bot.set_my_commands([
-        BotCommand(command="start", description="Начать / перезапустить"),
-        BotCommand(command="progress", description="Мой прогресс по треку"),
-        BotCommand(command="export", description="Экспорт трека текстом"),
-        BotCommand(command="cancel", description="Отменить текущий процесс"),
-        BotCommand(command="help", description="Справка"),
-    ])
+    await bot.delete_my_commands()
 
 
 async def on_shutdown(bot: Bot) -> None:
