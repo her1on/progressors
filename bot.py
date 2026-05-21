@@ -570,6 +570,29 @@ def _cancel_user_tasks(user_id: int) -> None:
 async def cmd_start(message: Message, state: FSMContext):
     _cancel_user_tasks(message.from_user.id)
     await state.clear()
+
+    track = await asyncio.to_thread(_sb_get_track, message.from_user.id)
+    if track and track.get("stages"):
+        goal = track.get("goal", "")
+        current = track.get("current_stage") or 0
+        total = len(track["stages"])
+        completed = len(track.get("completed") or [])
+        await message.answer(
+            f"👋 С возвращением!\n\n"
+            f"У тебя есть незавершённый трек: *{escape_md(goal)}*\n"
+            f"Прогресс: {completed} из {total} этапов пройдено\n\n"
+            f"Продолжить с этапа {current + 1}?",
+            reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+                [InlineKeyboardButton(text="▶️ Продолжить трек", callback_data="resume_track")],
+                [InlineKeyboardButton(text="🚀 Начать новый маршрут", callback_data="start_new")],
+            ]),
+        )
+        return
+
+    await _send_welcome(message, state)
+
+
+async def _send_welcome(message: Message, state: FSMContext):
     await message.answer(
         "🪐 *Прогрессоры* — твой ИИ-навигатор по обучению\n\n"
         "Я помогу построить персональный трек обучения — с бесплатными материалами "
@@ -579,6 +602,43 @@ async def cmd_start(message: Message, state: FSMContext):
         reply_markup=kb_menu(),
     )
     await state.set_state(Form.goal)
+
+
+@dp.callback_query(F.data == "resume_track")
+async def resume_track(callback: CallbackQuery, state: FSMContext):
+    await callback.answer()
+    try:
+        await callback.message.delete()
+    except Exception:
+        pass
+    track = await asyncio.to_thread(_sb_get_track, callback.from_user.id)
+    if not track or not track.get("stages"):
+        await _send_welcome(callback.message, state)
+        return
+    current_stage = track.get("current_stage") or 0
+    await state.update_data(
+        stages=track["stages"],
+        completed=track.get("completed") or [],
+        current_stage=current_stage,
+        goal=track.get("goal") or "",
+        level=track.get("level") or "",
+        hours=track.get("hours") or 0,
+        months=track.get("months") or 0,
+        goal_scope=track.get("goal_scope") or "широкий",
+        skills_text=track.get("skills_text") or "",
+    )
+    await state.set_state(Form.track)
+    await _send_stage(callback.message, state, current_stage)
+
+
+@dp.callback_query(F.data == "start_new")
+async def start_new(callback: CallbackQuery, state: FSMContext):
+    await callback.answer()
+    try:
+        await callback.message.delete()
+    except Exception:
+        pass
+    await _send_welcome(callback.message, state)
 
 
 @dp.message(Command("help"))
@@ -609,7 +669,9 @@ async def cmd_help(message: Message):
 
 @dp.message(F.text.in_({"🚀 Новый маршрут", "Новый маршрут"}))
 async def menu_new_route(message: Message, state: FSMContext):
-    await cmd_start(message, state)
+    _cancel_user_tasks(message.from_user.id)
+    await state.clear()
+    await _send_welcome(message, state)
 
 
 @dp.message(F.text == "📊 Прогресс")
