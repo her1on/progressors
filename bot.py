@@ -1362,8 +1362,10 @@ async def _resolve_youtube_links(text: str, used_ids: set[str], max_videos: int 
                 used_ids.add(video_id)
                 text = text.replace(search_url, video_url)
                 resolved += 1
-        except Exception:
-            pass
+            else:
+                logger.warning(f"YouTube API returned None for {title!r}")
+        except Exception as e:
+            logger.warning(f"YouTube resolve failed for {title!r}: {e}")
     return text
 
 
