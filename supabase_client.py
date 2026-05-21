@@ -72,45 +72,47 @@ def get_track(user_id: int) -> dict | None:
 
 
 def save_liked_stage(user_id: int, goal: str, stage_title: str, topics: str, materials: str) -> None:
-    try:
-        _request("POST", "liked_stages", {
-            "user_id": user_id,
-            "goal": goal,
-            "stage_title": stage_title,
-            "topics": topics or "",
-            "materials": materials or "",
-        })
-        logger.info(f"save_liked_stage OK: user={user_id} stage={stage_title!r}")
-    except Exception as e:
-        logger.error(f"save_liked_stage FAILED: user={user_id} stage={stage_title!r} error={e!r}")
+    """Данные уже сохранены в user_tracks.stages с флагом liked=True — ничего не делаем."""
+    pass
 
 
 def get_liked_stages(user_id: int) -> list[dict]:
-    result = _request("GET", f"liked_stages?user_id=eq.{user_id}&order=created_at.desc&limit=20")
-    return result if isinstance(result, list) else []
+    """Извлекает лайкнутые этапы из истории user_tracks."""
+    result = _request("GET", f"user_tracks?user_id=eq.{user_id}&select=goal,stages&order=updated_at.desc&limit=10")
+    if not isinstance(result, list):
+        return []
+    liked = []
+    for track in result:
+        goal = track.get("goal", "")
+        for stage in (track.get("stages") or []):
+            if stage.get("liked"):
+                liked.append({
+                    "goal": goal,
+                    "stage_title": stage.get("title", ""),
+                    "topics": stage.get("topics", ""),
+                    "materials": stage.get("materials", ""),
+                })
+    return liked[:20]
 
 
 def update_difficulty_bias(user_id: int, direction: str) -> None:
-    """direction: 'hard' или 'easy'."""
-    field = "hard_count" if direction == "hard" else "easy_count"
-    existing = _request("GET", f"user_preferences?user_id=eq.{user_id}&select={field}")
-    if existing and isinstance(existing, list) and existing:
-        current = existing[0].get(field, 0) or 0
-        _request("PATCH", f"user_preferences?user_id=eq.{user_id}", {
-            field: current + 1,
-            "updated_at": "now()",
-        })
-    else:
-        _request("POST", "user_preferences", {
-            "user_id": user_id,
-            "hard_count": 1 if direction == "hard" else 0,
-            "easy_count": 1 if direction == "easy" else 0,
-        }, prefer="return=minimal")
+    """Данные уже сохранены в user_tracks.stages с флагом modified — ничего не делаем."""
+    pass
 
 
 def get_difficulty_bias(user_id: int) -> dict:
-    """Возвращает {'hard_count': int, 'easy_count': int}."""
-    result = _request("GET", f"user_preferences?user_id=eq.{user_id}&select=hard_count,easy_count")
-    if result and isinstance(result, list) and result:
-        return result[0]
-    return {"hard_count": 0, "easy_count": 0}
+    """Считает simplified/advanced модификации из истории user_tracks."""
+    result = _request("GET", f"user_tracks?user_id=eq.{user_id}&select=stages&order=updated_at.desc&limit=10")
+    if not isinstance(result, list):
+        return {"hard_count": 0, "easy_count": 0}
+    hard_count = sum(
+        1 for track in result
+        for stage in (track.get("stages") or [])
+        if stage.get("modified") == "simplified"
+    )
+    easy_count = sum(
+        1 for track in result
+        for stage in (track.get("stages") or [])
+        if stage.get("modified") == "advanced"
+    )
+    return {"hard_count": hard_count, "easy_count": easy_count}
