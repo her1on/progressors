@@ -19,6 +19,7 @@ _HEADERS_UPSERT = {**_HEADERS_BASE, "Prefer": "resolution=merge-duplicates"}
 
 def _request(method: str, path: str, body: dict | None = None, prefer: str | None = None) -> dict | list | None:
     if not SUPABASE_URL or not SUPABASE_KEY:
+        logger.error(f"[DB] Supabase not configured: URL={bool(SUPABASE_URL)} KEY={bool(SUPABASE_KEY)}")
         return None
     url = f"{SUPABASE_URL}/rest/v1/{path}"
     data = json.dumps(body).encode() if body else None
@@ -32,9 +33,12 @@ def _request(method: str, path: str, body: dict | None = None, prefer: str | Non
     try:
         with urllib.request.urlopen(req, timeout=5) as resp:
             text = resp.read().decode()
+            logger.info(f"[DB] {method} {path} → {resp.status}")
             return json.loads(text) if text else {}
     except urllib.error.HTTPError as e:
-        raise RuntimeError(f"Supabase {method} {path}: {e.code} {e.read().decode()}")
+        body_text = e.read().decode()
+        logger.error(f"[DB] {method} {path} → {e.code}: {body_text}")
+        raise RuntimeError(f"Supabase {method} {path}: {e.code} {body_text}")
 
 
 def save_track(user_id: int, goal: str, level: str, hours: int, months: int,
