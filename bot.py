@@ -42,7 +42,16 @@ from llm_client import call_llm
 from level import parse_questions
 from stepik import search_stepik_courses
 from youtube import search_youtube_video
-from supabase_client import save_track as _sb_save_track, update_progress as _sb_update_progress, update_stages as _sb_update_stages, get_track as _sb_get_track
+from supabase_client import (
+    save_track as _sb_save_track,
+    update_progress as _sb_update_progress,
+    update_stages as _sb_update_stages,
+    get_track as _sb_get_track,
+    save_liked_stage as _sb_save_liked_stage,
+    get_liked_stages as _sb_get_liked_stages,
+    update_difficulty_bias as _sb_update_difficulty_bias,
+    get_difficulty_bias as _sb_get_difficulty_bias,
+)
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -1022,6 +1031,13 @@ async def _proceed_after_months(message: Message, user_id: int, state: FSMContex
 
         data = await state.get_data()
         weeks = data["months"] * 4
+        try:
+            liked_stages, difficulty_bias = await asyncio.gather(
+                asyncio.to_thread(_sb_get_liked_stages, user_id),
+                asyncio.to_thread(_sb_get_difficulty_bias, user_id),
+            )
+        except Exception:
+            liked_stages, difficulty_bias = [], {"hard_count": 0, "easy_count": 0}
         prompt = track_prompt(
             goal=data["goal"],
             level=level,
@@ -1033,6 +1049,8 @@ async def _proceed_after_months(message: Message, user_id: int, state: FSMContex
             format_pref=data.get("format_pref", "Любой формат"),
             scope=data.get("goal_scope", "широкий"),
             skills_text=data.get("skills_text", ""),
+            liked_stages=liked_stages,
+            difficulty_bias=difficulty_bias,
         )
         track_task = asyncio.create_task(_fetch_track(prompt))
         _track_tasks[user_id] = track_task
@@ -1267,6 +1285,13 @@ async def build_track(callback: CallbackQuery, state: FSMContext):
             if not task:
                 data = await state.get_data()
                 weeks = data["months"] * 4
+                try:
+                    _liked, _bias = await asyncio.gather(
+                        asyncio.to_thread(_sb_get_liked_stages, user_id),
+                        asyncio.to_thread(_sb_get_difficulty_bias, user_id),
+                    )
+                except Exception:
+                    _liked, _bias = [], {"hard_count": 0, "easy_count": 0}
                 prompt = track_prompt(
                     goal=data["goal"],
                     level=data["level"],
@@ -1278,6 +1303,8 @@ async def build_track(callback: CallbackQuery, state: FSMContext):
                     format_pref=data.get("format_pref", ""),
                     scope=data.get("goal_scope", "широкий"),
                     skills_text=data.get("skills_text", ""),
+                    liked_stages=_liked,
+                    difficulty_bias=_bias,
                 )
                 task = asyncio.create_task(_fetch_track(prompt))
             stages, summary = await task
@@ -1308,6 +1335,14 @@ async def build_track(callback: CallbackQuery, state: FSMContext):
     search_task = _search_term_tasks.pop(user_id, None)
     final_data = await state.get_data()
     search_terms = final_data.get("goal", "").split("—")[0].strip()
+    try:
+        liked_stages, difficulty_bias = await asyncio.gather(
+            asyncio.to_thread(_sb_get_liked_stages, user_id),
+            asyncio.to_thread(_sb_get_difficulty_bias, user_id),
+        )
+    except Exception:
+        liked_stages, difficulty_bias = [], {"hard_count": 0, "easy_count": 0}
+    await state.update_data(liked_stages=liked_stages, difficulty_bias=difficulty_bias)
     if search_task:
         if search_task.done() and not search_task.exception():
             search_terms = search_task.result()
@@ -1638,6 +1673,14 @@ async def stage_like(callback: CallbackQuery, state: FSMContext):
     stages[idx]["liked"] = True
     await state.update_data(stages=stages)
     asyncio.create_task(asyncio.to_thread(_sb_update_stages, callback.from_user.id, stages))
+    asyncio.create_task(asyncio.to_thread(
+        _sb_save_liked_stage,
+        callback.from_user.id,
+        data.get("goal", ""),
+        stage["title"],
+        stage.get("topics", ""),
+        stage.get("materials", ""),
+    ))
     is_last = idx == len(stages) - 1
     await callback.message.edit_reply_markup(reply_markup=kb_stage(idx, is_last, "liked"))
     await callback.answer("❤️ Этап сохранён как понравившийся!")
@@ -1689,6 +1732,7 @@ async def stage_hard(callback: CallbackQuery, state: FSMContext):
     stages[idx]["disliked"] = True
     await state.update_data(stages=stages)
     asyncio.create_task(asyncio.to_thread(_sb_update_stages, callback.from_user.id, stages))
+    asyncio.create_task(asyncio.to_thread(_sb_update_difficulty_bias, callback.from_user.id, "hard"))
     await msg.delete()
     try:
         await _send_stage(callback.message, state, idx)
@@ -1721,6 +1765,7 @@ async def stage_easy(callback: CallbackQuery, state: FSMContext):
     stages[idx]["disliked"] = True
     await state.update_data(stages=stages)
     asyncio.create_task(asyncio.to_thread(_sb_update_stages, callback.from_user.id, stages))
+    asyncio.create_task(asyncio.to_thread(_sb_update_difficulty_bias, callback.from_user.id, "easy"))
     await msg.delete()
     try:
         await _send_stage(callback.message, state, idx)

@@ -130,7 +130,7 @@ D) Занимаюсь на продвинутом/профессионально
 Не добавляй пояснений, markdown-блоков, комментариев — только JSON-массив."""
 
 
-def track_prompt(goal: str, level: str, hours: int, months: int, weeks: int, qa_text: str, motivation: str = "", format_pref: str = "", scope: str = "широкий", skills_text: str = "") -> str:
+def track_prompt(goal: str, level: str, hours: int, months: int, weeks: int, qa_text: str, motivation: str = "", format_pref: str = "", scope: str = "широкий", skills_text: str = "", liked_stages: list = None, difficulty_bias: dict = None) -> str:
     motivation_instruction = {
         "Новая профессия": "Делай акцент на карьерных перспективах, востребованности навыков у работодателей и портфолио.",
         "Текущая работа":  "Фокус на практическом применении прямо сейчас, конкретных рабочих задачах.",
@@ -143,6 +143,28 @@ def track_prompt(goal: str, level: str, hours: int, months: int, weeks: int, qa_
         "Курсы":        "ТОЛЬКО структурированные курсы на Stepik (бесплатные). YouTube — не добавлять.",
         "Любой формат": "Смешанный подход: YouTube для видео, Stepik для курсов.",
     }.get(format_pref, "")
+
+    liked_stages = liked_stages or []
+    difficulty_bias = difficulty_bias or {}
+
+    liked_block = ""
+    if liked_stages:
+        lines = []
+        for s in liked_stages[:5]:
+            lines.append(f"- «{s.get('stage_title', '')}» (из цели: {s.get('goal', '')})\n  Темы: {(s.get('topics') or '')[:200]}")
+        liked_block = (
+            "\nПОНРАВИВШИЕСЯ ЭТАПЫ ПОЛЬЗОВАТЕЛЯ (из прошлых треков):\n"
+            + "\n".join(lines)
+            + "\nЕсли тема пересекается с текущей целью — используй эти этапы как ориентир по стилю, глубине и подбору материалов. Нерелевантные — игнорируй.\n"
+        )
+
+    hard = difficulty_bias.get("hard_count", 0) or 0
+    easy = difficulty_bias.get("easy_count", 0) or 0
+    bias_block = ""
+    if hard >= 2 and hard >= easy * 2:
+        bias_block = "\nПАТТЕРН СЛОЖНОСТИ: пользователь регулярно находит материал слишком сложным — делай подачу на шаг проще стандартного, больше примеров и пошаговых объяснений.\n"
+    elif easy >= 2 and easy >= hard * 2:
+        bias_block = "\nПАТТЕРН СЛОЖНОСТИ: пользователь регулярно находит материал слишком лёгким — углубляй темы, добавляй нестандартные задачи и edge cases.\n"
 
     итог_instruction = (
         "Что конкретно умеет делать пользователь после прохождения трека (1–2 предложения)."
@@ -173,7 +195,7 @@ A/B → пробел в знаниях, включи в трек. C/D → уже
 
 {f"МОТИВАЦИЯ: {motivation_instruction}" if motivation_instruction else ""}
 ФОРМАТ МАТЕРИАЛОВ: {format_instruction}
-
+{liked_block}{bias_block}
 ОГРАНИЧЕНИЯ:
 - Только бесплатные материалы на русском языке
 - Допустимые источники: YouTube, Stepik (бесплатные курсы)

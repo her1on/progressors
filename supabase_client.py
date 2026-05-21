@@ -66,3 +66,44 @@ def get_track(user_id: int) -> dict | None:
     if result and isinstance(result, list) and len(result) > 0:
         return result[0]
     return None
+
+
+def save_liked_stage(user_id: int, goal: str, stage_title: str, topics: str, materials: str) -> None:
+    _request("POST", "liked_stages", {
+        "user_id": user_id,
+        "goal": goal,
+        "stage_title": stage_title,
+        "topics": topics or "",
+        "materials": materials or "",
+    }, prefer="return=minimal")
+
+
+def get_liked_stages(user_id: int) -> list[dict]:
+    result = _request("GET", f"liked_stages?user_id=eq.{user_id}&order=created_at.desc&limit=20")
+    return result if isinstance(result, list) else []
+
+
+def update_difficulty_bias(user_id: int, direction: str) -> None:
+    """direction: 'hard' или 'easy'."""
+    field = "hard_count" if direction == "hard" else "easy_count"
+    existing = _request("GET", f"user_preferences?user_id=eq.{user_id}&select={field}")
+    if existing and isinstance(existing, list) and existing:
+        current = existing[0].get(field, 0) or 0
+        _request("PATCH", f"user_preferences?user_id=eq.{user_id}", {
+            field: current + 1,
+            "updated_at": "now()",
+        })
+    else:
+        _request("POST", "user_preferences", {
+            "user_id": user_id,
+            "hard_count": 1 if direction == "hard" else 0,
+            "easy_count": 1 if direction == "easy" else 0,
+        }, prefer="return=minimal")
+
+
+def get_difficulty_bias(user_id: int) -> dict:
+    """Возвращает {'hard_count': int, 'easy_count': int}."""
+    result = _request("GET", f"user_preferences?user_id=eq.{user_id}&select=hard_count,easy_count")
+    if result and isinstance(result, list) and result:
+        return result[0]
+    return {"hard_count": 0, "easy_count": 0}
