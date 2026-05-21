@@ -1698,6 +1698,7 @@ async def on_startup(bot: Bot) -> None:
     await bot.set_my_commands([
         BotCommand(command="start", description="Начать / перезапустить"),
         BotCommand(command="progress", description="Мой прогресс по треку"),
+        BotCommand(command="export", description="Экспорт трека текстом"),
         BotCommand(command="cancel", description="Отменить текущий процесс"),
         BotCommand(command="help", description="Справка"),
     ])
