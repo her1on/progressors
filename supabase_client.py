@@ -1,7 +1,10 @@
 import json
+import logging
 import os
 import urllib.request
 import urllib.error
+
+logger = logging.getLogger(__name__)
 
 SUPABASE_URL = os.getenv("SUPABASE_URL", "")
 SUPABASE_KEY = os.getenv("SUPABASE_SECRET_KEY", "")
@@ -69,13 +72,17 @@ def get_track(user_id: int) -> dict | None:
 
 
 def save_liked_stage(user_id: int, goal: str, stage_title: str, topics: str, materials: str) -> None:
-    _request("POST", "liked_stages", {
-        "user_id": user_id,
-        "goal": goal,
-        "stage_title": stage_title,
-        "topics": topics or "",
-        "materials": materials or "",
-    }, prefer="return=minimal")
+    try:
+        _request("POST", "liked_stages", {
+            "user_id": user_id,
+            "goal": goal,
+            "stage_title": stage_title,
+            "topics": topics or "",
+            "materials": materials or "",
+        })
+        logger.info(f"save_liked_stage OK: user={user_id} stage={stage_title!r}")
+    except Exception as e:
+        logger.error(f"save_liked_stage FAILED: user={user_id} stage={stage_title!r} error={e!r}")
 
 
 def get_liked_stages(user_id: int) -> list[dict]:
