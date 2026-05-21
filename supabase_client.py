@@ -83,23 +83,31 @@ def get_track(user_id: int) -> dict | None:
     return None
 
 
+def save_liked_stages(user_id: int, goal: str, stages: list) -> None:
+    for stage in stages:
+        if stage.get("liked"):
+            _request("POST", "liked_stages", {
+                "user_id": user_id,
+                "goal": goal,
+                "stage_title": stage.get("title", ""),
+                "topics": stage.get("topics", ""),
+                "materials": stage.get("materials", ""),
+            }, prefer="return=minimal")
+
+
 def get_liked_stages(user_id: int) -> list[dict]:
-    """Извлекает лайкнутые этапы из истории user_tracks."""
-    result = _request("GET", f"user_tracks?user_id=eq.{user_id}&select=goal,stages&order=updated_at.desc&limit=10")
+    result = _request("GET", f"liked_stages?user_id=eq.{user_id}&select=goal,stage_title,topics,materials&order=id.desc&limit=20")
     if not isinstance(result, list):
         return []
-    liked = []
-    for track in result:
-        goal = track.get("goal", "")
-        for stage in (track.get("stages") or []):
-            if stage.get("liked"):
-                liked.append({
-                    "goal": goal,
-                    "stage_title": stage.get("title", ""),
-                    "topics": stage.get("topics", ""),
-                    "materials": stage.get("materials", ""),
-                })
-    return liked[:20]
+    return [
+        {
+            "goal": r.get("goal", ""),
+            "stage_title": r.get("stage_title", ""),
+            "topics": r.get("topics", ""),
+            "materials": r.get("materials", ""),
+        }
+        for r in result
+    ]
 
 
 def get_difficulty_bias(user_id: int) -> dict:

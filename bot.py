@@ -49,6 +49,7 @@ from supabase_client import (
     get_track as _sb_get_track,
     get_liked_stages as _sb_get_liked_stages,
     get_difficulty_bias as _sb_get_difficulty_bias,
+    save_liked_stages as _sb_save_liked_stages,
 )
 
 logging.basicConfig(level=logging.INFO)
@@ -1399,6 +1400,15 @@ async def build_track(callback: CallbackQuery, state: FSMContext):
     search_task = _search_term_tasks.pop(user_id, None)
     final_data = await state.get_data()
     search_terms = final_data.get("goal", "").split("—")[0].strip()
+
+    # Сохраняем лайкнутые этапы из старого трека до перезаписи
+    old_stages = final_data.get("stages") or []
+    old_goal = final_data.get("goal", "")
+    if any(s.get("liked") for s in old_stages):
+        asyncio.create_task(_bg(
+            asyncio.to_thread(_sb_save_liked_stages, user_id, old_goal, old_stages),
+            "save_liked_stages",
+        ))
     try:
         liked_stages, difficulty_bias = await asyncio.gather(
             asyncio.to_thread(_sb_get_liked_stages, user_id),
