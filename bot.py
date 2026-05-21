@@ -301,9 +301,12 @@ def kb_build():
 WEBAPP_URL = os.getenv("WEBAPP_URL", "https://progressors-production.up.railway.app")
 
 
-def kb_stage(idx: int, is_last: bool, feedback: str | None = None):
+def kb_stage(idx: int, is_last: bool, feedback: str | None = None, is_done: bool = False):
     rows = [
-        [InlineKeyboardButton(text="✅ Пройдено", callback_data=f"done_{idx}")],
+        [InlineKeyboardButton(
+            text="✓ Этап пройден" if is_done else "✅ Пройдено",
+            callback_data="noop" if is_done else f"done_{idx}",
+        )],
     ]
     if feedback is None:
         rows.append([
@@ -666,7 +669,11 @@ async def cmd_export(message: Message, state: FSMContext):
     ]
 
     text = "\n".join(lines)
-    await message.answer(text[:4096], parse_mode="Markdown")
+    try:
+        await message.answer(text[:4096], parse_mode="Markdown")
+    except Exception:
+        plain = text.replace("*", "").replace("_", "").replace("\\", "")
+        await message.answer(plain[:4096])
 
 
 @dp.message(Command("cancel"))
@@ -1419,21 +1426,22 @@ async def _send_stage(message: Message, state: FSMContext, idx: int, edit: bool 
                 pass
 
     feedback = _stage_feedback(stage)
+    is_done = idx in data.get("completed", [])
     no_preview = LinkPreviewOptions(is_disabled=True)
     if edit:
         try:
-            sent = await message.edit_text(text[:4000], reply_markup=kb_stage(idx, is_last, feedback), link_preview_options=no_preview)
+            sent = await message.edit_text(text[:4000], reply_markup=kb_stage(idx, is_last, feedback, is_done), link_preview_options=no_preview)
         except Exception:
-            sent = await message.answer(text[:4000], reply_markup=kb_stage(idx, is_last, feedback), link_preview_options=no_preview)
+            sent = await message.answer(text[:4000], reply_markup=kb_stage(idx, is_last, feedback, is_done), link_preview_options=no_preview)
     else:
         try:
-            sent = await message.answer(text[:4000], reply_markup=kb_stage(idx, is_last, feedback), link_preview_options=no_preview)
+            sent = await message.answer(text[:4000], reply_markup=kb_stage(idx, is_last, feedback, is_done), link_preview_options=no_preview)
         except Exception as e:
             logger.warning(f"Markdown send failed for stage {idx}, retrying as plain text: {e}")
             sent = await message.answer(
                 re.sub(r"[*_`\[\]]", "", text[:4000]),
                 parse_mode=None,
-                reply_markup=kb_stage(idx, is_last, feedback),
+                reply_markup=kb_stage(idx, is_last, feedback, is_done),
                 link_preview_options=no_preview,
             )
 
