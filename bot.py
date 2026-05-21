@@ -1563,6 +1563,22 @@ async def _send_stage(message: Message, state: FSMContext, idx: int, edit: bool 
             except Exception as e:
                 logger.warning(f"Stepik search failed for {query!r}: {e}")
 
+        if not courses and sp.get("subject_id"):
+            for query in queries:
+                try:
+                    found = await asyncio.to_thread(
+                        search_stepik_courses, query, 0, 3,
+                        subject=None,
+                        difficulty=stage_difficulty,
+                        filter_terms=sp["query"],
+                    )
+                    logger.info(f"Stepik {query!r} subject=None (no-subj fallback) diff={stage_difficulty}: {len(found)}")
+                    if found:
+                        courses = found
+                        break
+                except Exception as e:
+                    logger.warning(f"Stepik no-subj search failed for {query!r}: {e}")
+
         if courses:
             lines = ["\n*Курсы на Stepik:*\n"]
             for c in courses:
