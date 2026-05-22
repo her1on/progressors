@@ -139,7 +139,6 @@ def track_prompt(goal: str, level: str, hours: int, months: int, weeks: int, qa_
 
     format_instruction = {
         "Видео":        "ТОЛЬКО видеоматериалы с YouTube. Stepik — не добавлять.",
-        "Статьи":       "Используй YouTube для видео-объяснений и Stepik для курсов. Добавляй только эти источники.",
         "Курсы":        "ТОЛЬКО структурированные курсы на Stepik (бесплатные). YouTube — не добавлять.",
         "Любой формат": "Смешанный подход: YouTube для видео, Stepik для курсов.",
     }.get(format_pref, "")
@@ -259,7 +258,6 @@ def simplify_prompt(goal: str, level: str, stage_title: str, stage_content: str,
 2–3 бесплатных русскоязычных ресурса строго по темам этого этапа:
 [YouTube] Название — Канал
 [Stepik] Название курса
-[Habr] Название статьи
 Без вводных фраз, без жирного текста, без кавычек."""
 
 
@@ -286,7 +284,6 @@ def advance_prompt(goal: str, level: str, stage_title: str, stage_content: str, 
 2–3 продвинутых бесплатных русскоязычных ресурса строго по темам этого этапа:
 [YouTube] Название — Канал
 [Stepik] Название курса
-[Habr] Название статьи
 Без вводных фраз, без жирного текста, без кавычек."""
 
 
@@ -304,5 +301,4 @@ def alternative_prompt(goal: str, level: str, stage_title: str, stage_content: s
 Верни ТОЛЬКО 3–5 строк — без вступления, без пояснений:
 [YouTube] Название — Канал
 [Stepik] Название курса
-[Habr] Название статьи
 Каждый материал строго по темам этого этапа. Без жирного текста, без кавычек."""
