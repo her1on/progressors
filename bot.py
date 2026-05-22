@@ -1485,6 +1485,8 @@ async def _resolve_youtube_links(text: str, used_ids: set[str], max_videos: int 
                 logger.warning(f"YouTube API returned None for {query!r}")
         except Exception as e:
             logger.warning(f"YouTube resolve failed for {query!r}: {e}")
+    # Убираем строки с неразрешёнными search URL — они отображаются с двойным encoding в Telegram iOS
+    text = re.sub(r"[^\n]*youtube\.com/results\?search_query=[^\n]*\n?", "", text)
     return text
 
 
