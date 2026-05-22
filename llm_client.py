@@ -20,6 +20,8 @@ def _get_client() -> OpenAI:
 
 
 def call_llm(prompt: str, model: str = "gpt-5.5", timeout: float | None = None) -> str:
+    import logging
+    logger = logging.getLogger(__name__)
     client = _get_client()
     for attempt in range(3):
         try:
@@ -30,7 +32,8 @@ def call_llm(prompt: str, model: str = "gpt-5.5", timeout: float | None = None) 
                     **({"timeout": timeout} if timeout is not None else {}),
                 )
             return response.choices[0].message.content
-        except Exception:
+        except Exception as e:
             if attempt == 2:
                 raise
+            logger.warning(f"[LLM] attempt {attempt + 1} failed ({model}): {e!r}, retrying in {2 ** attempt}s")
             time.sleep(2 ** attempt)
