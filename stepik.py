@@ -92,7 +92,15 @@ def search_stepik_courses(
     # Фильтр релевантности по ключевым словам
     key_words = [w.lower() for w in (filter_terms or query).split() if len(w) >= 3]
     if key_words:
-        filtered = [c for c in filtered if any(kw in c["title"].lower() for kw in key_words)]
+        latin_words = [w for w in key_words if w.isascii()]
+        min_matches = min(2, len(key_words))
+        if latin_words:
+            filtered = [c for c in filtered
+                        if any(lw in c["title"].lower() for lw in latin_words)
+                        and sum(kw in c["title"].lower() for kw in key_words) >= min_matches]
+        else:
+            filtered = [c for c in filtered
+                        if sum(kw in c["title"].lower() for kw in key_words) >= min_matches]
 
     if not filtered:
         return []
