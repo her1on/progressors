@@ -6,29 +6,25 @@ import urllib.error
 
 logger = logging.getLogger(__name__)
 
-SUPABASE_URL = os.getenv("SUPABASE_URL", "")
-SUPABASE_KEY = os.getenv("SUPABASE_SECRET_KEY", "")
-
-_HEADERS_BASE = {
-    "Content-Type": "application/json",
-    "apikey": SUPABASE_KEY,
-    "Authorization": f"Bearer {SUPABASE_KEY}",
-}
-_HEADERS_UPSERT = {**_HEADERS_BASE, "Prefer": "resolution=merge-duplicates"}
-
-
 def _request(method: str, path: str, body: dict | None = None, prefer: str | None = None) -> dict | list | None:
-    if not SUPABASE_URL or not SUPABASE_KEY:
-        logger.error(f"[DB] Supabase not configured: URL={bool(SUPABASE_URL)} KEY={bool(SUPABASE_KEY)}")
+    supabase_url = os.getenv("SUPABASE_URL", "")
+    supabase_key = os.getenv("SUPABASE_SECRET_KEY", "")
+    if not supabase_url or not supabase_key:
+        logger.error(f"[DB] Supabase not configured: URL={bool(supabase_url)} KEY={bool(supabase_key)}")
         return None
-    url = f"{SUPABASE_URL}/rest/v1/{path}"
+    base_headers = {
+        "Content-Type": "application/json",
+        "apikey": supabase_key,
+        "Authorization": f"Bearer {supabase_key}",
+    }
+    url = f"{supabase_url}/rest/v1/{path}"
     data = json.dumps(body).encode() if body else None
     if prefer:
-        headers = {**_HEADERS_BASE, "Prefer": prefer}
+        headers = {**base_headers, "Prefer": prefer}
     elif method == "POST":
-        headers = _HEADERS_UPSERT
+        headers = {**base_headers, "Prefer": "resolution=merge-duplicates"}
     else:
-        headers = _HEADERS_BASE
+        headers = base_headers
     req = urllib.request.Request(url, data=data, headers=headers, method=method)
     try:
         with urllib.request.urlopen(req, timeout=5) as resp:
