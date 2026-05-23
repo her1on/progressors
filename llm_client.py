@@ -6,6 +6,9 @@ from openai import OpenAI
 
 logger = logging.getLogger(__name__)
 
+LLM_MODEL = "gpt-5.5"
+LLM_MODEL_FALLBACK = "gpt-5.4"
+
 _client: OpenAI | None = None
 _sem = threading.Semaphore(3)
 
@@ -22,7 +25,7 @@ def _get_client() -> OpenAI:
     return _client
 
 
-def call_llm(prompt: str, model: str = "gpt-5.5", timeout: float | None = None) -> str:
+def call_llm(prompt: str, model: str = LLM_MODEL, timeout: float | None = None) -> str:
     client = _get_client()
     for attempt in range(3):
         try:

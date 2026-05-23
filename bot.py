@@ -38,7 +38,7 @@ from bot_prompts import (
     track_prompt,
     validate_prompt,
 )
-from llm_client import call_llm
+from llm_client import call_llm, LLM_MODEL, LLM_MODEL_FALLBACK
 from level import parse_questions
 from stepik import search_stepik_courses
 from youtube import search_youtube_video
@@ -210,7 +210,7 @@ async def _extract_search_terms(goal: str) -> str:
 
 async def _fetch_track(prompt: str) -> tuple[list[dict], str]:
     last_exc: Exception | None = None
-    for model in ("gpt-5.5", "gpt-5.4"):
+    for model in (LLM_MODEL, LLM_MODEL_FALLBACK):
         try:
             track_text = await asyncio.to_thread(call_llm, prompt, model, 90)
             logger.info(f"Track raw response [{model}] (first 300): {track_text[:300]}")
