@@ -789,6 +789,9 @@ async def got_goal(message: Message, state: FSMContext):
             "Пожалуйста, напиши конкретную цель — например, _Python_, _дизайн_ или _английский язык_."
         )
         return
+    if len(goal) > 500:
+        await message.answer("Цель слишком длинная — напиши короче, до 500 символов.")
+        return
 
     stop = asyncio.Event()
     typing_task = asyncio.create_task(_typing_loop(message.chat.id, stop))
