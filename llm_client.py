@@ -1,7 +1,10 @@
+import logging
 import os
 import threading
 import time
 from openai import OpenAI
+
+logger = logging.getLogger(__name__)
 
 _client: OpenAI | None = None
 _sem = threading.Semaphore(3)
@@ -20,8 +23,6 @@ def _get_client() -> OpenAI:
 
 
 def call_llm(prompt: str, model: str = "gpt-5.5", timeout: float | None = None) -> str:
-    import logging
-    logger = logging.getLogger(__name__)
     client = _get_client()
     for attempt in range(3):
         try:
