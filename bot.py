@@ -1901,8 +1901,9 @@ async def restart(callback: CallbackQuery, state: FSMContext):
 WEBHOOK_PATH = "/webhook"
 WEBHOOK_SECRET = os.getenv("WEBHOOK_SECRET")
 if not WEBHOOK_SECRET:
-    logger.warning("WEBHOOK_SECRET not set, using insecure default")
-    WEBHOOK_SECRET = "progressors-secret-2026"
+    if os.getenv("RAILWAY_PUBLIC_DOMAIN"):
+        raise RuntimeError("WEBHOOK_SECRET must be set in production")
+    WEBHOOK_SECRET = "local-dev"
 
 
 async def on_startup(bot: Bot) -> None:
